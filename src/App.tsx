@@ -14,6 +14,9 @@ import Documentation from './components/Documentation';
 import LoadScriptModal from './components/LoadScriptModal';
 import RenameScriptModal from './components/RenameScriptModal';
 import { ScriptLanguage, LANGUAGE_CONFIGS } from './types/script';
+import ProfilePage from './components/ProfilePage';
+import SettingsPage from './components/SettingsPage';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 
 interface User {
   name: string;
@@ -48,7 +51,7 @@ interface AlertState {
 
 type AlertOptions = Omit<AlertState, 'isOpen'>;
 
-const App: React.FC = () => {
+const AppContent: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -67,7 +70,7 @@ const App: React.FC = () => {
     type: 'info'
   });
   const [isNewScriptModalOpen, setIsNewScriptModalOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(288); // 72 * 4 = 288px (w-72 equivalent)
+  const [sidebarWidth, setSidebarWidth] = useState(288);
   const isResizing = useRef(false);
   const lastX = useRef(0);
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -79,6 +82,12 @@ const App: React.FC = () => {
   const [scriptHistory, setScriptHistory] = useState<ScriptChange[]>([]);
   const [isLoadScriptModalOpen, setIsLoadScriptModalOpen] = useState(false);
   const [scriptToRename, setScriptToRename] = useState<Script | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [editorFontSize, setEditorFontSize] = useState(14);
+  const [autoSave, setAutoSave] = useState(true);
+  const [notifications, setNotifications] = useState(true);
+  const { theme, setTheme } = useTheme();
 
   const apiKey = "sk_test_1234567890abcdefghijklmnopqrstuvwxyz";
 
@@ -881,10 +890,52 @@ const App: React.FC = () => {
     });
   };
 
+  const handleUpdateProfile = (name: string, email: string) => {
+    setCurrentUser(prev => prev ? { ...prev, name, email } : null);
+    showAlert({
+      title: 'Success',
+      message: 'Profile updated successfully',
+      type: 'success'
+    });
+  };
+
+  // Add new function for project deletion
+  const handleDeleteProject = (projectId: string) => {
+    const projectToDelete = projects.find(p => p.id === projectId);
+    if (!projectToDelete) return;
+
+    showAlert({
+      title: 'Confirm Project Deletion',
+      message: `Are you sure you want to delete "${projectToDelete.name}"? This action cannot be undone.`,
+      type: 'warning',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      onConfirm: () => {
+        // Remove project from list
+        setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+        
+        // Clear logs for this project
+        setExecutionLogs(prevLogs => prevLogs.filter(log => log.projectId !== projectId));
+        
+        // If current project is being deleted, reset current project and script
+        if (currentProject?.id === projectId) {
+          setCurrentProject(null);
+          setCurrentScript(null);
+        }
+
+        showAlert({
+          title: 'Success',
+          message: 'Project deleted successfully',
+          type: 'success'
+        });
+      }
+    });
+  };
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-dark-900">
       {/* Header with gradient and shadow */}
-      <header className="bg-gradient-to-r from-blue-600 to-blue-800 shadow-lg">
+      <header className="bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-800 dark:to-primary-900 shadow-lg">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -892,11 +943,11 @@ const App: React.FC = () => {
             onClick={handleLogoClick}
             className="flex items-center space-x-3 group focus:outline-none"
           >
-            <div className="bg-white bg-opacity-20 p-2 rounded-lg transform transition-all duration-200 group-hover:scale-110 group-hover:bg-opacity-30">
+            <div className="bg-white/20 p-2 rounded-lg transform transition-all duration-200 group-hover:scale-110 group-hover:bg-white/30">
               <i className="fas fa-code text-white text-2xl"></i>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight transition-colors duration-200 group-hover:text-blue-100">
-              LambdaExecutor Hub
+            <h1 className="text-2xl font-bold text-white tracking-tight transition-colors duration-200 group-hover:text-primary-50 font-display">
+              MIET Lambda Hub
             </h1>
           </motion.button>
           <div className="flex items-center space-x-6">
@@ -904,7 +955,7 @@ const App: React.FC = () => {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setShowDocumentation(!showDocumentation)}
-              className="text-sm bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
+              className="text-sm bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
             >
               <i className={`fas fa-${showDocumentation ? 'home' : 'book'}`}></i>
               <span>{showDocumentation ? 'Home' : 'Documentation'}</span>
@@ -913,23 +964,33 @@ const App: React.FC = () => {
               <>
                 <button
                   onClick={() => setIsApiKeyModalOpen(true)}
-                  className="text-sm bg-white bg-opacity-20 hover:bg-opacity-30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
+                  className="text-sm bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
                 >
                   <i className="fas fa-key"></i>
                   <span>API Key</span>
                 </button>
                 <div className="relative group">
                   <button className="flex items-center space-x-3 focus:outline-none">
-                    <div className="w-10 h-10 rounded-lg bg-white bg-opacity-20 flex items-center justify-center text-white font-semibold text-lg transform transition-transform group-hover:scale-105">
+                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white font-semibold text-lg transform transition-transform group-hover:scale-105">
                       {currentUser.name.charAt(0).toUpperCase()}
                     </div>
                     <i className="fas fa-chevron-down text-white text-xs opacity-70 group-hover:opacity-100 transition-opacity"></i>
                   </button>
-                  <div className="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-xl py-2 scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
-                    <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">Profile</button>
-                    <button className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors">Settings</button>
-                    <div className="h-px bg-gray-200 my-2"></div>
-                    <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">Sign Out</button>
+                  <div className="absolute right-0 mt-3 w-48 bg-white dark:bg-dark-800 rounded-xl shadow-xl py-2 scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
+                    <button 
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-body"
+                      onClick={() => setShowProfile(true)}
+                    >
+                      Profile
+                    </button>
+                    <button 
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-body"
+                      onClick={() => setShowSettings(true)}
+                    >
+                      Settings
+                    </button>
+                    <div className="h-px bg-gray-200 dark:bg-dark-700 my-2"></div>
+                    <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-warning-600 dark:text-warning-500 hover:bg-warning-50 dark:hover:bg-warning-900/30 transition-colors">Sign Out</button>
                   </div>
                 </div>
               </>
@@ -938,7 +999,7 @@ const App: React.FC = () => {
               <div className="ml-8">
                 <button
                   onClick={() => setIsAuthModalOpen(true)}
-                  className="text-sm bg-white hover:bg-opacity-90 text-blue-600 px-6 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 font-medium"
+                  className="text-sm bg-white hover:bg-opacity-90 text-primary-600 px-6 py-2 rounded-lg shadow-md hover:shadow-lg transition-all duration-200 font-medium"
                 >
                   Sign In
                 </button>
@@ -975,7 +1036,7 @@ const App: React.FC = () => {
               <div 
                 ref={sidebarRef}
                 style={{ width: sidebarWidth }}
-                className="relative hidden md:block bg-gradient-to-b from-gray-800 to-gray-900 text-white"
+                className="relative hidden md:block bg-gradient-to-b from-gray-800 to-gray-900 dark:from-dark-800 dark:to-dark-900 text-white"
               >
                 <div className="h-full overflow-y-auto">
                   <div className="p-6">
@@ -1018,16 +1079,32 @@ const App: React.FC = () => {
                       {projects.map(project => (
                         <div
                           key={project.id}
-                          className={`cursor-pointer py-3 px-4 rounded-xl transition-all duration-200 ${
+                          onClick={() => openProject(project)}
+                          className={`group cursor-pointer py-3 px-4 rounded-xl transition-all duration-200 ${
                             currentProject?.id === project.id 
                               ? 'bg-blue-600 shadow-lg' 
                               : 'hover:bg-white hover:bg-opacity-10'
                           }`}
-                          onClick={() => openProject(project)}
                         >
-                          <div className="flex items-center space-x-3">
-                            <i className="fas fa-project-diagram opacity-70"></i>
-                            <span className="truncate font-medium">{project.name}</span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3 flex-grow">
+                              <i className="fas fa-project-diagram opacity-70"></i>
+                              <span className="truncate font-medium">{project.name}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteProject(project.id);
+                              }}
+                              className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-200 ${
+                                currentProject?.id === project.id
+                                  ? 'text-white/70 hover:text-white hover:bg-white/10'
+                                  : 'text-gray-400 hover:text-red-500 hover:bg-red-500/10'
+                              }`}
+                              title="Delete Project"
+                            >
+                              <i className="fas fa-trash-alt"></i>
+                            </button>
                           </div>
                           {project.description && (
                             <p className="text-sm text-gray-400 mt-1 truncate pl-7">{project.description}</p>
@@ -1057,7 +1134,7 @@ const App: React.FC = () => {
 
               {/* Project Content Area */}
               <motion.div 
-                className="flex-1 flex flex-col overflow-hidden bg-white"
+                className="flex-1 flex flex-col overflow-hidden bg-white dark:bg-dark-800"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -1067,7 +1144,7 @@ const App: React.FC = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
-                    className="bg-gradient-to-r from-gray-50 to-white border-b"
+                    className="bg-gradient-to-r from-gray-50 to-white dark:from-dark-900 dark:to-dark-800 border-b dark:border-dark-700 flex-shrink-0"
                   >
                     <div className="container mx-auto px-6 py-4 flex justify-between items-center">
                       <div>
@@ -1115,84 +1192,87 @@ const App: React.FC = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.4 }}
-                    className="bg-gray-50 border-b"
+                    className="bg-gray-50 dark:bg-dark-900 border-b dark:border-dark-700 flex-shrink-0 h-14"
                   >
-                    <div className="container mx-auto px-6 flex overflow-x-auto">
-                      <div className="flex py-2">
-                        <AnimatePresence>
-                          {currentProject.scripts.map(script => (
-                            <motion.div
-                              key={script.name}
-                              initial={{ opacity: 0, scale: 0.95 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              whileHover={{ scale: 1.02 }}
-                              whileTap={{ scale: 0.98 }}
-                              className={`px-4 py-2 cursor-pointer rounded-lg mx-1 transition-all duration-200 flex items-center space-x-2 ${
-                                currentScript?.name === script.name
-                                  ? 'bg-white shadow-md text-blue-600'
-                                  : 'hover:bg-white hover:shadow-sm text-gray-600 hover:text-gray-800'
-                              }`}
-                              onClick={() => setCurrentScript(script)}
-                            >
-                              <i className="fas fa-file-code text-sm opacity-70"></i>
-                              <span>{script.name}</span>
-                              <div className="flex items-center space-x-2 ml-2">
-                                <button
-                                  className="text-gray-400 hover:text-purple-600 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleTestScript(script);
-                                  }}
-                                  title="Test Script"
-                                >
-                                  <i className="fas fa-flask text-sm"></i>
-                                </button>
-                                <button
-                                  className="text-gray-400 hover:text-blue-600 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedScript(script);
-                                    setIsUrlConfigOpen(true);
-                                  }}
-                                  title="Configure URL Path"
-                                >
-                                  <i className="fas fa-link text-sm"></i>
-                                </button>
-                                <button
-                                  className="text-gray-400 hover:text-yellow-600 transition-colors"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setScriptToRename(script);
-                                  }}
-                                  title="Rename Script"
-                                >
-                                  <i className="fas fa-pencil-alt text-sm"></i>
-                                </button>
-                                {currentProject.scripts.length > 1 && (
+                    <div className="container mx-auto h-full px-6">
+                      <div className="flex items-center h-full">
+                        <div className="flex items-center space-x-1 overflow-x-auto py-2 flex-grow scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+                          <AnimatePresence mode="popLayout">
+                            {currentProject.scripts.map(script => (
+                              <motion.div
+                                key={script.name}
+                                layout
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className={`px-4 py-2 cursor-pointer rounded-lg transition-all duration-200 flex items-center space-x-2 flex-shrink-0 ${
+                                  currentScript?.name === script.name
+                                    ? 'bg-white shadow-md text-blue-600'
+                                    : 'hover:bg-white hover:shadow-sm text-gray-600 hover:text-gray-800'
+                                }`}
+                                onClick={() => setCurrentScript(script)}
+                              >
+                                <i className="fas fa-file-code text-sm opacity-70"></i>
+                                <span className="whitespace-nowrap">{script.name}</span>
+                                <div className="flex items-center space-x-2 ml-2">
                                   <button
-                                    className="text-gray-400 hover:text-red-500 transition-colors"
+                                    className="text-gray-400 hover:text-purple-600 transition-colors"
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleDeleteScript(script.name);
+                                      handleTestScript(script);
                                     }}
-                                    title="Delete Script"
+                                    title="Test Script"
                                   >
-                                    <i className="fas fa-times"></i>
+                                    <i className="fas fa-flask text-sm"></i>
                                   </button>
-                                )}
-                              </div>
-                            </motion.div>
-                          ))}
-                        </AnimatePresence>
+                                  <button
+                                    className="text-gray-400 hover:text-blue-600 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedScript(script);
+                                      setIsUrlConfigOpen(true);
+                                    }}
+                                    title="Configure URL Path"
+                                  >
+                                    <i className="fas fa-link text-sm"></i>
+                                  </button>
+                                  <button
+                                    className="text-gray-400 hover:text-yellow-600 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setScriptToRename(script);
+                                    }}
+                                    title="Rename Script"
+                                  >
+                                    <i className="fas fa-pencil-alt text-sm"></i>
+                                  </button>
+                                  {currentProject.scripts.length > 1 && (
+                                    <button
+                                      className="text-gray-400 hover:text-red-500 transition-colors"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteScript(script.name);
+                                      }}
+                                      title="Delete Script"
+                                    >
+                                      <i className="fas fa-times"></i>
+                                    </button>
+                                  )}
+                                </div>
+                              </motion.div>
+                            ))}
+                          </AnimatePresence>
+                        </div>
                         <motion.button
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setIsNewScriptModalOpen(true)}
-                          className="ml-2 px-3 py-2 text-blue-600 hover:text-blue-700 transition-colors flex items-center space-x-2"
+                          className="ml-4 px-3 py-2 text-blue-600 hover:text-blue-700 transition-colors flex items-center space-x-2 flex-shrink-0"
                         >
                           <i className="fas fa-plus"></i>
-                          <span className="text-sm">New Script</span>
+                          <span className="text-sm whitespace-nowrap">New Script</span>
                         </motion.button>
                       </div>
                     </div>
@@ -1208,7 +1288,7 @@ const App: React.FC = () => {
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.3 }}
-                      className="flex-1 overflow-hidden"
+                      className="flex-1 min-h-0 relative dark:bg-dark-900"
                     >
                       {showLogs ? (
                         <ExecutionLogs
@@ -1218,15 +1298,17 @@ const App: React.FC = () => {
                           currentProjectId={currentProject.id}
                         />
                       ) : (
-                        <CodeEditor
-                          value={currentScript.content}
-                          onChange={(value) => {
-                            setCurrentScript({
-                              ...currentScript,
-                              content: value
-                            });
-                          }}
-                        />
+                        <div className="absolute inset-0">
+                          <CodeEditor
+                            value={currentScript.content}
+                            onChange={(value) => {
+                              setCurrentScript({
+                                ...currentScript,
+                                content: value
+                              });
+                            }}
+                          />
+                        </div>
                       )}
                     </motion.div>
                   ) : (
@@ -1236,7 +1318,7 @@ const App: React.FC = () => {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.5 }}
-                      className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-gray-50 to-white"
+                      className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-gradient-to-b from-gray-50 to-white dark:from-dark-900 dark:to-dark-800"
                     >
                       <motion.div
                         whileHover={{ scale: 1.1, rotate: 360 }}
@@ -1249,15 +1331,15 @@ const App: React.FC = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.2 }}
-                        className="text-3xl font-bold text-gray-800 mb-4"
+                        className="text-3xl font-bold text-gray-800 mb-4 font-display"
                       >
-                        Welcome to LambdaExecutor Hub
+                        Welcome to MIET Lambda Hub
                       </motion.h2>
                       <motion.p
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.3 }}
-                        className="text-gray-600 max-w-lg mb-8 leading-relaxed"
+                        className="text-gray-600 max-w-lg mb-8 leading-relaxed font-body"
                       >
                         Create a new project to start writing and executing Lua scripts in the cloud. 
                         Your scripts can be executed via our HTTP API from anywhere.
@@ -1399,8 +1481,135 @@ const App: React.FC = () => {
           existingNames={currentProject.scripts.map(s => s.name)}
         />
       )}
+      {/* Profile Page */}
+      <AnimatePresence>
+        {showProfile && currentUser && (
+          <div className="fixed inset-0 bg-white z-50">
+            <ProfilePage
+              user={currentUser}
+              onClose={() => setShowProfile(false)}
+              onUpdateProfile={handleUpdateProfile}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+      {/* Settings Page */}
+      <AnimatePresence>
+        {showSettings && (
+          <div className="fixed inset-0 bg-white z-50">
+            <SettingsPage
+              onClose={() => setShowSettings(false)}
+              editorFontSize={editorFontSize}
+              onEditorFontSizeChange={setEditorFontSize}
+              autoSave={autoSave}
+              onAutoSaveChange={setAutoSave}
+              notifications={notifications}
+              onNotificationsChange={setNotifications}
+            />
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
+const App: React.FC = () => {
+  return (
+    <ThemeProvider>
+      <div className="min-h-screen flex flex-col">
+        <AppContent />
+        {/* Copyright Footer */}
+      </div>
+    </ThemeProvider>
+  );
+};
+
 export default App;
+
+
+<footer className="mt-auto relative">
+  {/* Gradient overlay */}
+  <div className="absolute inset-0 bg-gradient-to-b from-transparent via-accent-50/30 to-accent-100/40 dark:from-transparent dark:via-dark-800/50 dark:to-dark-900/60 pointer-events-none" />
+  
+  {/* Main footer content */}
+  <div className="relative px-6 py-3 bg-gradient-to-r from-white/90 to-accent-50/90 dark:from-dark-900/90 dark:to-dark-800/90 backdrop-blur-sm border-t border-accent-200/20 dark:border-dark-700/30">
+    <div className="container mx-auto">
+      {/* Top section with links */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
+        <div className="flex items-center space-x-6">
+          <motion.a 
+            href="#"
+            className="text-sm text-dark-600 dark:text-dark-300 hover:text-accent-600 dark:hover:text-accent-400 transition-colors flex items-center space-x-1 group"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className="fas fa-shield-alt text-accent-600/70 group-hover:text-accent-600 dark:text-accent-400/70 dark:group-hover:text-accent-400 transition-colors" />
+            <span>Terms of Service</span>
+          </motion.a>
+          <motion.a 
+            href="#"
+            className="text-sm text-dark-600 dark:text-dark-300 hover:text-accent-600 dark:hover:text-accent-400 transition-colors flex items-center space-x-1 group"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className="fas fa-user-shield text-accent-600/70 group-hover:text-accent-600 dark:text-accent-400/70 dark:group-hover:text-accent-400 transition-colors" />
+            <span>Privacy Policy</span>
+          </motion.a>
+        </div>
+        
+        <div className="flex items-center space-x-4">
+          <motion.a 
+            href="https://github.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dark-600 dark:text-dark-400 hover:text-accent-700 dark:hover:text-accent-300 transition-colors"
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className="fab fa-github text-xl" />
+          </motion.a>
+          <motion.a 
+            href="https://twitter.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dark-600 dark:text-dark-400 hover:text-accent-700 dark:hover:text-accent-300 transition-colors"
+            whileHover={{ scale: 1.1, rotate: -5 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className="fab fa-twitter text-xl" />
+          </motion.a>
+          <motion.a 
+            href="https://discord.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-dark-600 dark:text-dark-400 hover:text-accent-700 dark:hover:text-accent-300 transition-colors"
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className="fab fa-discord text-xl" />
+          </motion.a>
+        </div>
+      </div>
+
+      {/* Bottom section with copyright */}
+      <div className="flex justify-center pt-4 border-t border-accent-200/20 dark:border-dark-700/30">
+        <div className="flex items-center">
+          <motion.div 
+            className="bg-gradient-to-br from-accent-500 to-accent-600 p-1.5 rounded-lg shadow-sm mr-3"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <i className="fas fa-code text-white text-sm"></i>
+          </motion.div>
+          <div className="text-sm font-body">
+            <span className="text-dark-600 dark:text-dark-400">© 2025 </span>
+            <span className="font-semibold text-accent-700 dark:text-accent-400 font-display">
+              MIET Lambda Hub
+            </span>
+            <span className="text-dark-600 dark:text-dark-400"> • All rights reserved</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>

@@ -161,70 +161,70 @@ const ExecutionLogs: React.FC<ExecutionLogsProps> = ({ logs, scriptHistory, onCl
                 </div>
               </div>
               <div className="divide-y divide-gray-200">
-                {filteredLogs.map((log) => (
+              {filteredLogs.map((log) => (
                   <div
                     key={log.id}
                     onClick={() => setSelectedLog(log)}
                     className="grid grid-cols-8 gap-4 px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors duration-150"
                   >
                     <div className="col-span-1 text-sm text-gray-600">
-                      {log.timestamp.toLocaleString()}
+                    {log.timestamp.toLocaleString()}
                     </div>
-                    {showAllProjects && (
+                  {showAllProjects && (
                       <div className="col-span-1 text-sm font-medium text-gray-900">
-                        <div className="flex items-center">
-                          <i className="fas fa-project-diagram mr-2 opacity-70"></i>
-                          {log.projectName}
+                      <div className="flex items-center">
+                        <i className="fas fa-project-diagram mr-2 opacity-70"></i>
+                        {log.projectName}
                         </div>
                       </div>
-                    )}
+                  )}
                     <div className="col-span-1 text-sm font-medium text-gray-900">
-                      <div className="flex items-center">
-                        <i className="fas fa-file-code mr-2 opacity-70"></i>
-                        {log.scriptName}
+                    <div className="flex items-center">
+                      <i className="fas fa-file-code mr-2 opacity-70"></i>
+                      {log.scriptName}
                       </div>
                     </div>
                     <div className="col-span-1">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          log.status === 'success'
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}
-                      >
-                        {log.status}
-                      </span>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        log.status === 'success'
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}
+                    >
+                      {log.status}
+                    </span>
                     </div>
                     <div className="col-span-2 text-sm text-gray-500">
-                      <div className="max-w-lg truncate">
-                        {log.status === 'success' ? log.response : log.error}
+                    <div className="max-w-lg truncate">
+                      {log.status === 'success' ? log.response : log.error}
                       </div>
                     </div>
                     <div className="col-span-1 text-sm text-gray-600">
-                      {log.executionCost.toFixed(2)} credits
+                    {log.executionCost.toFixed(2)} credits
                     </div>
                     <div className="col-span-1 text-sm text-gray-600">
-                      {log.memoryUsed.toFixed(1)} MB
+                    {log.memoryUsed.toFixed(1)} MB
                     </div>
                     <div className="col-span-1 text-sm text-gray-600">
-                      {log.executionTime} ms
+                    {log.executionTime} ms
                     </div>
                   </div>
-                ))}
+              ))}
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full text-center p-8">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <i className="fas fa-history text-gray-400 text-xl"></i>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No execution logs {!showAllProjects ? 'for this project ' : ''}yet
-              </h3>
-              <p className="text-gray-600">
-                Execute a script to see its logs appear here
-              </p>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full text-center p-8">
+            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <i className="fas fa-history text-gray-400 text-xl"></i>
             </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No execution logs {!showAllProjects ? 'for this project ' : ''}yet
+            </h3>
+            <p className="text-gray-600">
+              Execute a script to see its logs appear here
+            </p>
+          </div>
           )
         ) : (
           // Script History Content

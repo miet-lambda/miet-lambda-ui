@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Editor, { Monaco } from '@monaco-editor/react';
 import AiAssistant from './AiAssistant';
-import AiConfig from './AiConfig';
 import { aiService, Message } from '../services/aiService';
+import { motion, AnimatePresence } from 'framer-motion';
 import '../styles/editor.css';
 
 interface EditorProps {
@@ -18,46 +18,61 @@ const CodeEditor: React.FC<EditorProps> = ({ value, onChange }) => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [selectedCode, setSelectedCode] = useState('');
-  const [isAiConfigOpen, setIsAiConfigOpen] = useState(false);
+  const [chatWidth, setChatWidth] = useState(320);
   const editorRef = useRef<any>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const isResizing = useRef(false);
+  const lastX = useRef(0);
   const lastY = useRef(0);
+  const isChatResizing = useRef(false);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Debounced layout update function
+  const updateEditorLayout = useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
+    }
+    
+    resizeTimeoutRef.current = setTimeout(() => {
+      if (editorRef.current) {
+        editorRef.current.layout();
+      }
+    }, 16); // Roughly one frame at 60fps
+  }, []);
 
   // Handle fullscreen changes
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(document.fullscreenElement !== null);
+      updateEditorLayout();
     };
 
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, []);
+  }, [updateEditorLayout]);
 
-  // Handle manual resizing
+  // Handle chat panel resizing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing.current) return;
+      if (!isChatResizing.current) return;
       
-      const container = editorContainerRef.current;
-      if (!container) return;
-
-      const dy = e.clientY - lastY.current;
-      const newHeight = container.offsetHeight + dy;
+      const dx = lastX.current - e.clientX;
+      const newWidth = Math.max(280, Math.min(800, chatWidth + dx));
       
-      // Constrain height between 200px and 1000px
-      if (newHeight >= 200 && newHeight <= 1000) {
-        container.style.height = `${newHeight}px`;
-        lastY.current = e.clientY;
+      if (newWidth !== chatWidth) {
+        setChatWidth(newWidth);
+        updateEditorLayout();
       }
+      lastX.current = e.clientX;
     };
 
     const handleMouseUp = () => {
-      isResizing.current = false;
+      isChatResizing.current = false;
       document.body.style.cursor = 'default';
       document.body.style.userSelect = 'auto';
+      updateEditorLayout();
     };
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -66,43 +81,34 @@ const CodeEditor: React.FC<EditorProps> = ({ value, onChange }) => {
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, []);
-
-  // Toggle fullscreen
-  const toggleFullscreen = useCallback(async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
       }
-    } catch (err) {
-      console.error('Error toggling fullscreen:', err);
-    }
-  }, []);
+    };
+  }, [chatWidth, updateEditorLayout]);
 
-  // Handle font size changes
-  const handleFontSizeChange = (delta: number) => {
-    setFontSize(prev => Math.max(8, Math.min(32, prev + delta)));
-  };
+  // Update editor layout when chat visibility changes
+  useEffect(() => {
+    updateEditorLayout();
+  }, [showAiAssistant, updateEditorLayout]);
 
-  // Start resize
-  const startResize = (e: React.MouseEvent) => {
-    isResizing.current = true;
-    lastY.current = e.clientY;
-    document.body.style.cursor = 'row-resize';
+  const startChatResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isChatResizing.current = true;
+    lastX.current = e.clientX;
+    document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   };
 
   const handleEditorDidMount = (editor: any, monaco: Monaco) => {
     editorRef.current = editor;
-
-    // Add selection change listener
+    
     editor.onDidChangeCursorSelection((e: any) => {
       const selection = editor.getModel().getValueInRange(e.selection);
       setSelectedCode(selection);
     });
+
+    updateEditorLayout();
   };
 
   // Handle AI messages
@@ -182,150 +188,149 @@ const CodeEditor: React.FC<EditorProps> = ({ value, onChange }) => {
   };
 
   const handleAiToggle = () => {
-    // Check if API key is configured
-    const apiKey = localStorage.getItem('openai_api_key');
-    if (!apiKey) {
-      setIsAiConfigOpen(true);
-    } else {
-      setShowAiAssistant(!showAiAssistant);
-    }
+    setShowAiAssistant(!showAiAssistant);
+  };
+
+  // Start resize
+  const startResize = (e: React.MouseEvent) => {
+    isResizing.current = true;
+    lastY.current = e.clientY;
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
   };
 
   return (
     <div 
       ref={editorContainerRef}
-      className={`editor-container relative ${isFullscreen ? 'fullscreen' : ''}`}
-      style={{ height: isFullscreen ? '100vh' : '500px' }}
+      className={`relative flex flex-col ${isFullscreen ? 'fixed inset-0 z-50 bg-gray-900' : 'h-full'}`}
     >
-      <div className="flex flex-col h-full">
-        {/* Editor Toolbar */}
-        <div className="bg-gray-800 text-white px-4 py-2 flex justify-between items-center editor-toolbar">
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => handleFontSizeChange(-2)}
-                className="p-1 hover:bg-gray-700 rounded"
-                title="Decrease font size"
-              >
-                <i className="fas fa-minus text-sm"></i>
-              </button>
-              <span className="text-sm">{fontSize}px</span>
-              <button
-                onClick={() => handleFontSizeChange(2)}
-                className="p-1 hover:bg-gray-700 rounded"
-                title="Increase font size"
-              >
-                <i className="fas fa-plus text-sm"></i>
-              </button>
-            </div>
-            <div className="h-4 w-px bg-gray-600"></div>
-            <button
-              onClick={() => setShowMinimap(!showMinimap)}
-              className={`p-1 rounded transition-colors ${
-                showMinimap ? 'bg-blue-600 hover:bg-blue-700' : 'hover:bg-gray-700'
-              }`}
-              title="Toggle minimap"
-            >
-              <i className="fas fa-map text-sm"></i>
-            </button>
-          </div>
+      {/* Editor Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+        <div className="flex items-center space-x-4">
+          {/* Font Size Control */}
           <div className="flex items-center space-x-2">
             <button
-              onClick={handleExplainCode}
-              className="p-1 hover:bg-gray-700 rounded transition-colors"
-              title="Explain Code"
+              onClick={() => setFontSize(prev => Math.max(8, prev - 2))}
+              className="text-gray-400 hover:text-white transition-colors"
             >
-              <i className="fas fa-question-circle text-sm"></i>
+              <i className="fas fa-minus"></i>
             </button>
+            <span className="text-gray-300 text-sm">{fontSize}px</span>
             <button
-              onClick={() => setIsAiConfigOpen(true)}
-              className="p-1 hover:bg-gray-700 rounded transition-colors"
-              title="Configure AI"
+              onClick={() => setFontSize(prev => Math.min(32, prev + 2))}
+              className="text-gray-400 hover:text-white transition-colors"
             >
-              <i className="fas fa-cog text-sm"></i>
-            </button>
-            <button
-              onClick={handleAiToggle}
-              className={`p-1 rounded transition-colors ${
-                showAiAssistant ? 'bg-blue-600 hover:bg-blue-700' : 'hover:bg-gray-700'
-              }`}
-              title="Toggle AI Assistant"
-            >
-              <i className="fas fa-robot text-sm"></i>
-            </button>
-            <button
-              onClick={toggleFullscreen}
-              className="p-1 hover:bg-gray-700 rounded transition-colors"
-              title="Toggle fullscreen"
-            >
-              <i className={`fas fa-${isFullscreen ? 'compress' : 'expand'} text-sm`}></i>
+              <i className="fas fa-plus"></i>
             </button>
           </div>
+
+          {/* Minimap Toggle */}
+          <button
+            onClick={() => setShowMinimap(!showMinimap)}
+            className={`text-sm px-3 py-1 rounded-lg transition-colors ${
+              showMinimap ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <i className="fas fa-map"></i>
+          </button>
         </div>
 
-        {/* Editor Content */}
-        <div className="flex flex-1 relative">
-          <div className="flex-1">
-            <Editor
-              height="100%"
-              defaultLanguage="lua"
-              theme="vs-dark"
-              value={value}
-              onChange={(value) => onChange(value || '')}
-              onMount={handleEditorDidMount}
-              options={{
-                minimap: { enabled: showMinimap },
-                fontSize,
-                lineNumbers: 'on',
-                roundedSelection: false,
-                scrollBeyondLastLine: false,
-                readOnly: false,
-                automaticLayout: true,
-                padding: { top: 10, bottom: 10 },
-                smoothScrolling: true,
-                cursorBlinking: 'smooth',
-                cursorSmoothCaretAnimation: 'on',
-                formatOnPaste: true,
-                formatOnType: true,
-                renderWhitespace: 'selection',
-                renderLineHighlight: 'line',
-                scrollbar: {
-                  verticalScrollbarSize: 12,
-                  horizontalScrollbarSize: 12,
-                },
-                overviewRulerLanes: 0,
-                lineDecorationsWidth: 8,
-                wordWrap: 'off',
-                glyphMargin: false,
-                folding: true,
-                lineHeight: 1.5,
-                letterSpacing: 0.5,
-                suggestSelection: 'first',
-                quickSuggestions: true,
-                quickSuggestionsDelay: 10,
-                snippetSuggestions: 'top',
-                tabSize: 2,
-                insertSpaces: true,
-                detectIndentation: true,
-                trimAutoWhitespace: true,
-              }}
-              loading={
-                <div className="flex items-center justify-center h-full bg-gray-900">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                </div>
+        <div className="flex items-center space-x-4">
+          {/* AI Assistant Button */}
+          <button
+            onClick={() => setShowAiAssistant(!showAiAssistant)}
+            className={`text-sm px-3 py-1 rounded-lg transition-colors ${
+              showAiAssistant ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <i className="fas fa-robot mr-2"></i>
+            AI Assistant
+          </button>
+
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={() => {
+              if (isFullscreen) {
+                document.exitFullscreen();
+              } else {
+                editorContainerRef.current?.requestFullscreen();
               }
-            />
-          </div>
-          {showAiAssistant && (
-            <div className="w-80 border-l border-gray-700">
-              <AiAssistant
-                onSendMessage={(msg) => handleSendMessage(msg, 'general')}
-                isLoading={isAiLoading}
-                messages={messages}
-              />
-            </div>
-          )}
+            }}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
+            <i className={`fas fa-${isFullscreen ? 'compress' : 'expand'}`}></i>
+          </button>
         </div>
+      </div>
+
+      {/* Editor and AI Assistant */}
+      <div className="flex flex-1 overflow-hidden relative">
+        {/* Main Editor */}
+        <div 
+          className="flex-1 relative"
+          style={{
+            width: showAiAssistant ? `calc(100% - ${chatWidth}px)` : '100%',
+            transition: 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+          }}
+        >
+          <Editor
+            height="100%"
+            defaultLanguage="lua"
+            value={value}
+            onChange={value => value && onChange(value)}
+            theme="vs-dark"
+            options={{
+              fontSize: fontSize,
+              minimap: { 
+                enabled: showMinimap,
+                side: showAiAssistant ? 'left' : 'right',
+                maxColumn: 60,
+                renderCharacters: false,
+                showSlider: 'mouseover'
+              },
+              scrollBeyondLastLine: false,
+              wordWrap: 'on',
+              lineNumbers: 'on',
+              renderWhitespace: 'selection',
+              automaticLayout: false
+            }}
+            onMount={handleEditorDidMount}
+          />
+        </div>
+
+        {/* AI Assistant Panel */}
+        <AnimatePresence>
+          {showAiAssistant && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="w-1 cursor-col-resize hover:bg-blue-500 hover:bg-opacity-50 transition-colors"
+                onMouseDown={startChatResize}
+              />
+              <motion.div
+                initial={{ x: chatWidth, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: chatWidth, opacity: 0 }}
+                transition={{ 
+                  type: "tween",
+                  duration: 0.3,
+                  ease: "easeInOut"
+                }}
+                style={{ width: chatWidth }}
+                className="border-l border-gray-700 absolute right-0 top-0 bottom-0 bg-white dark:bg-dark-900"
+              >
+                <AiAssistant
+                  onSendMessage={(msg) => handleSendMessage(msg, 'general')}
+                  isLoading={isAiLoading}
+                  messages={messages}
+                />
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Resize Handle */}
@@ -335,17 +340,6 @@ const CodeEditor: React.FC<EditorProps> = ({ value, onChange }) => {
           onMouseDown={startResize}
         />
       )}
-
-      {/* AI Configuration Dialog */}
-      <AiConfig
-        isOpen={isAiConfigOpen}
-        onClose={() => {
-          setIsAiConfigOpen(false);
-          if (localStorage.getItem('openai_api_key') && !showAiAssistant) {
-            setShowAiAssistant(true);
-          }
-        }}
-      />
     </div>
   );
 };

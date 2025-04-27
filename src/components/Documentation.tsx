@@ -7,7 +7,7 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
       // Handle comments
       if (line.trim().startsWith('--')) {
         return (
-          <div key={index} className="text-gray-500">
+          <div key={index} className="text-gray-500 dark:text-gray-400">
             {line}
           </div>
         );
@@ -26,7 +26,7 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
           if (inString && char === stringChar) {
             // End of string
             currentPart += char;
-            parts.push(<span key={parts.length} className="text-emerald-400">{currentPart}</span>);
+            parts.push(<span key={parts.length} className="text-emerald-400 dark:text-emerald-300">{currentPart}</span>);
             currentPart = '';
             inString = false;
           } else if (!inString) {
@@ -54,7 +54,7 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
               if (beforeKeyword) {
                 parts.push(<span key={parts.length}>{beforeKeyword}</span>);
               }
-              parts.push(<span key={parts.length} className="text-purple-400">{keyword}</span>);
+              parts.push(<span key={parts.length} className="text-purple-400 dark:text-purple-300">{keyword}</span>);
               currentPart = '';
               break;
             }
@@ -71,8 +71,8 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
   };
 
   return (
-    <div className="mb-6 rounded-lg overflow-hidden bg-gray-900">
-      <pre className="p-4 text-sm text-gray-300 font-mono overflow-x-auto">
+    <div className="mb-6 rounded-lg overflow-hidden bg-gray-900 dark:bg-dark-900 shadow-lg">
+      <pre className="p-4 text-sm text-gray-300 dark:text-gray-200 font-mono overflow-x-auto">
         <code>{renderHighlightedCode(children)}</code>
       </pre>
     </div>
@@ -81,17 +81,17 @@ const CodeBlock: React.FC<{ children: string }> = ({ children }) => {
 
 const Documentation: React.FC = () => {
   return (
-    <div className="w-full h-full overflow-y-auto bg-white">
+    <div className="w-full h-full overflow-y-auto bg-white dark:bg-dark-900">
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <h1 className="text-4xl font-bold mb-8 text-gray-900">
+        <h1 className="text-4xl font-bold mb-8 text-gray-900 dark:text-gray-100">
           Документация по написанию Lua-скриптов для HTTP-сервиса
         </h1>
 
-        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800">Введение</h2>
-        <p className="mb-4 text-gray-600 leading-relaxed">
+        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800 dark:text-gray-200">Введение</h2>
+        <p className="mb-4 text-gray-600 dark:text-gray-400 leading-relaxed">
           Сервис позволяет выполнять пользовательские Lua-скрипты для обработки HTTP-запросов. Скрипты имеют доступ к:
         </p>
-        <ul className="mb-6 pl-6 list-disc text-gray-600">
+        <ul className="mb-6 pl-6 list-disc text-gray-600 dark:text-gray-400">
           <li className="mb-2">Данным входящего запроса.</li>
           <li className="mb-2">Формированию ответа.</li>
           <li className="mb-2">HTTP-клиенту для внешних запросов.</li>
@@ -99,11 +99,11 @@ const Documentation: React.FC = () => {
           <li className="mb-2">JSON-сериализации.</li>
         </ul>
 
-        <hr className="my-8 border-gray-200" />
+        <hr className="my-8 border-gray-200 dark:border-dark-700" />
 
-        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800">Доступные функции</h2>
+        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800 dark:text-gray-200">Доступные функции</h2>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">1. Работа с HTTP-контекстом</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">1. Работа с HTTP-контекстом</h3>
         <CodeBlock>{`local context = require('miet.http.context').get()
 
 -- Входящий запрос
@@ -124,7 +124,7 @@ response['body'] = {              -- Тело ответа (строка/таб�
   message = 'Hello'
 }`}</CodeBlock>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">2. Работа с HTTP клиентом</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">2. Работа с HTTP клиентом</h3>
         <CodeBlock>{`local client = require('miet.http.client').get()
 
 -- Отправка запроса
@@ -143,8 +143,8 @@ client:head(url, params)
 client:options(url, params)
 -- И др.`}</CodeBlock>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">3. Хранилище ключ-значение (KV Storage)</h3>
-        <p className="mb-4 text-gray-600 leading-relaxed">
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">3. Хранилище ключ-значение (KV Storage)</h3>
+        <p className="mb-4 text-gray-600 dark:text-gray-400 leading-relaxed">
           В рамках одного проекта у вас есть доступ к key-value хранлищу
         </p>
         <CodeBlock>{`local storage = require('miet.kv.storage').get()
@@ -163,7 +163,7 @@ local age = storage:get('age'):as_number()
 local active = storage:get('active'):as_boolean()
 local data = storage:get('data'):as_table() -- JSON → Lua-таблица`}</CodeBlock>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">4. Работа с JSON</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">4. Работа с JSON</h3>
         <CodeBlock>{`local json = require('dkjson')
 
 -- Кодирование
@@ -176,8 +176,8 @@ if err then
   -- Обработка ошибки
 end`}</CodeBlock>
 
-        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800">Запрещенные функции</h2>
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">Следующие функции недоступны из соображений безопасности:</h3>
+        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800 dark:text-gray-200">Запрещенные функции</h2>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">Следующие функции недоступны из соображений безопасности:</h3>
         <CodeBlock>{`os                    -- Запуск системных команд
 io                    -- Доступ к файловой системе
 package               -- Загрузка внешних библиотек
@@ -186,9 +186,9 @@ getfenv()             -- Доступ к окружению
 debug.getregistry()   -- Доступ к внутренним структурам Lua
 print()               -- Вывод в stdout`}</CodeBlock>
 
-        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800">Примеры использования</h2>
+        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800 dark:text-gray-200">Примеры использования</h2>
         
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">Пример 1: Валидация запроса</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">Пример 1: Валидация запроса</h3>
         <CodeBlock>{`local context = require('miet.http.context').get()
 local request = context:request()
 local response = context:response()
@@ -197,12 +197,9 @@ if request['method'] ~= 'POST' then
   response['status'] = 405
 end
 
-local data = json.decode(request['body'])
-if not data.email or not data.password then
-  response['status'] = 400
-end`}</CodeBlock>
+local data = json.decode(request['body'])`}</CodeBlock>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">Пример 2: Запрос к внешнему API</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">Пример 2: Запрос к внешнему API</h3>
         <CodeBlock>{`local client = require('miet.http.client').get()
 local response, err = client:post('https://auth-service.com/login', {
   body = {
@@ -217,7 +214,7 @@ end
 
 local token = json.decode(response['body']).token`}</CodeBlock>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">Пример 3: Кэширование данных</h3>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">Пример 3: Кэширование данных</h3>
         <CodeBlock>{`local storage = require('miet.kv.storage').get()
 local cached_data = storage:get('cached_data'):as_table()
 
@@ -228,14 +225,14 @@ end
 
 return cached_data`}</CodeBlock>
 
-        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800">Ограничения ресурсов</h2>
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">Таймаут выполнения</h3>
-        <p className="mb-4 text-gray-600 leading-relaxed">
+        <h2 className="text-2xl font-semibold mb-4 mt-8 text-gray-800 dark:text-gray-200">Ограничения ресурсов</h2>
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">Таймаут выполнения</h3>
+        <p className="mb-4 text-gray-600 dark:text-gray-400 leading-relaxed">
           Скрипт прерывается, если превышает лимит времени (По умолчанию 5 секунд).
         </p>
 
-        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700">Память</h3>
-        <p className="mb-4 text-gray-600 leading-relaxed">
+        <h3 className="text-xl font-semibold mb-3 mt-6 text-gray-700 dark:text-gray-300">Память</h3>
+        <p className="mb-4 text-gray-600 dark:text-gray-400 leading-relaxed">
           Превышение лимита памяти приводит к ошибке (По умолчанию лимит 10 MiB).
         </p>
       </div>
