@@ -1,0 +1,120 @@
+.editor-container {
+  border: 1px solid #2d2d2d;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.editor-container.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  border-radius: 0;
+  border: none;
+}
+
+.editor-toolbar {
+  user-select: none;
+  position: sticky;
+  top: 0;
+  z-index: 10000;
+}
+
+.editor-toolbar button {
+  transition: all 0.2s ease;
+}
+
+.editor-toolbar button:hover {
+  transform: translateY(-1px);
+}
+
+.editor-toolbar button:active {
+  transform: translateY(0);
+}
+
+/* Ensure toolbar buttons are always visible in fullscreen */
+.editor-container.fullscreen .editor-toolbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: #1e1e1e;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Adjust editor content position when in fullscreen */
+.editor-container.fullscreen .monaco-editor {
+  padding-top: 40px; /* Height of the toolbar */
+}
+
+/* Sidebar Resize Handle */
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  width: 4px;
+  height: 100%;
+  background: transparent;
+  cursor: col-resize;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Prevent text selection while resizing */
+.resizing * {
+  user-select: none !important;
+}
+
+/* Monaco Editor Customizations */
+.monaco-editor .margin {
+  border-right: 1px solid #3d3d3d !important;
+}
+
+.monaco-editor .cursor {
+  transition: all 0.1s ease !important;
+}
+
+/* Scrollbar Customizations */
+.monaco-editor .scrollbar {
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.monaco-editor .scrollbar:hover {
+  opacity: 1;
+}
+
+/* Line Number Customizations */
+.monaco-editor .line-numbers {
+  color: #6b7280 !important;
+  font-size: 0.9em !important;
+}
+
+/* Selection Customizations */
+.monaco-editor .selected-text {
+  background-color: rgba(59, 130, 246, 0.3) !important;
+}
+
+/* Current Line Highlight */
+.monaco-editor .current-line {
+  border: none !important;
+  background-color: rgba(55, 65, 81, 0.4) !important;
+}
+
+/* Resize Handle Animation */
+.editor-container:not(.fullscreen) .resize-handle {
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.editor-container:not(.fullscreen):hover .resize-handle {
+  opacity: 1;
+} 
