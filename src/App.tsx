@@ -17,6 +17,7 @@ import { ScriptLanguage, LANGUAGE_CONFIGS } from './types/script';
 import ProfilePage from './components/ProfilePage';
 import SettingsPage from './components/SettingsPage';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { auth, projects as projectsApi, scripts as scriptsApi } from './services/api';
 
 interface User {
   name: string;
@@ -88,294 +89,79 @@ const AppContent: React.FC = () => {
   const [autoSave, setAutoSave] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const { theme, setTheme } = useTheme();
+  const [draggedScript, setDraggedScript] = useState<Script | null>(null);
 
   const apiKey = "sk_test_1234567890abcdefghijklmnopqrstuvwxyz";
 
-  const simulateLogin = useCallback((name?: string, email?: string) => {
-    const user = {
-      name: name || 'Test User',
-      email: email || 'test@example.com'
-    };
-    setCurrentUser(user);
-    loadProjects();
+  const simulateLogin = useCallback(async (name?: string, email?: string) => {
+    try {
+      const response = await auth.getCurrentUser();
+      const userData = response.data;
+      setCurrentUser({
+        name: userData.login,
+        email: userData.login
+      });
+      loadProjects();
+    } catch (error) {
+      console.error('Failed to get current user:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to get user data',
+        type: 'error'
+      });
+    }
   }, []);
 
   useEffect(() => {
     // Check if user is logged in
-    const loggedIn = localStorage.getItem('loggedIn');
-    if (loggedIn) {
+    const accessToken = localStorage.getItem('access_token');
+    if (accessToken) {
       simulateLogin();
     }
-    
-    // Load sample projects if none exist
-    if (projects.length === 0) {
-      loadSampleProjects();
-    }
-  }, [projects.length, simulateLogin]);
+  }, [simulateLogin]);
 
-  const loadSampleProjects = () => {
-    const defaultConfig = {
-      memoryLimit: 128, // 128 MB
-      timeout: 30000 // 30000 milliseconds (30 seconds)
-    };
-
-    const sampleProjects = [
-      {
-        id: '1',
-        name: 'HTTP Handlers',
-        description: 'Sample HTTP endpoint handlers',
+  const loadProjects = async () => {
+    try {
+      const response = await projectsApi.getAll();
+      const projectsData = response.data;
+      setProjects(projectsData.map((p: any) => ({
+        id: p.id.toString(),
+        name: p.name,
+        description: '',
         createdAt: new Date(),
-        scripts: [
-          { 
-            id: '1-get-handler.lua', 
-            name: 'get-handler.lua', 
-            content: [
-              '-- Example GET request handler',
-              'local context = require(\'miet.http.context\').get()',
-              '',
-              '-- Get request details',
-              'local request = context:request()',
-              'local method = request[\'method\']  -- Should be GET',
-              'local query = request[\'query\']    -- Query parameters',
-              'local headers = request[\'headers\'] -- Request headers',
-              '',
-              '-- Process query parameters',
-              'local name = query[\'name\'] or \'World\'',
-              '',
-              '-- Set response',
-              'local response = context:response()',
-              'response[\'status\'] = 200',
-              'response[\'headers\'] = {',
-              '  [\'Content-Type\'] = \'application/json\'',
-              '}',
-              'response[\'body\'] = {',
-              '  message = string.format(\'Hello, %s!\', name),',
-              '  timestamp = os.time()',
-              '}'
-            ].join('\n'),
-            config: defaultConfig,
-            urlPath: '/api/greet'
-          },
-          { 
-            id: '1-post-handler.lua', 
-            name: 'post-handler.lua', 
-            content: [
-              '-- Example POST request handler',
-              'local context = require(\'miet.http.context\').get()',
-              '',
-              '-- Get request details',
-              'local request = context:request()',
-              'local method = request[\'method\']  -- Should be POST',
-              'local headers = request[\'headers\'] -- Request headers',
-              'local body = request[\'body\']      -- Request body',
-              '',
-              '-- Validate request',
-              'if not body.data then',
-              '  local response = context:response()',
-              '  response[\'status\'] = 400',
-              '  response[\'headers\'] = {',
-              '    [\'Content-Type\'] = \'application/json\'',
-              '  }',
-              '  response[\'body\'] = {',
-              '    error = \'Missing data in request body\'',
-              '  }',
-              '  return',
-              'end',
-              '',
-              '-- Process the data',
-              'local processed = {',
-              '  received = body.data,',
-              '  timestamp = os.time(),',
-              '  processed = true',
-              '}',
-              '',
-              '-- Send response',
-              'local response = context:response()',
-              'response[\'status\'] = 201',
-              'response[\'headers\'] = {',
-              '  [\'Content-Type\'] = \'application/json\'',
-              '}',
-              'response[\'body\'] = processed'
-            ].join('\n'),
-            config: defaultConfig,
-            urlPath: '/api/process'
-          }
-        ]
-      },
-      {
-        id: '2',
-        name: 'API Routes',
-        description: 'Advanced API routing examples',
-        createdAt: new Date(),
-        scripts: [
-          { 
-            id: '2-users.lua', 
-            name: 'users.lua', 
-            content: [
-              '-- User management API handler',
-              'local context = require(\'miet.http.context\').get()',
-              '',
-              'local request = context:request()',
-              'local method = request[\'method\']',
-              'local url = request[\'url\']',
-              'local query = request[\'query\']',
-              'local headers = request[\'headers\']',
-              'local body = request[\'body\']',
-              '',
-              '-- Simple in-memory user store',
-              'local users = {}',
-              '',
-              '-- Handle different HTTP methods',
-              'if method == \'GET\' then',
-              '  -- List users or get specific user',
-              '  local userId = query[\'id\']',
-              '  local response = context:response()',
-              '  ',
-              '  if userId then',
-              '    response[\'body\'] = users[userId] or { error = \'User not found\' }',
-              '    response[\'status\'] = users[userId] and 200 or 404',
-              '  else',
-              '    response[\'body\'] = users',
-              '    response[\'status\'] = 200',
-              '  end',
-              '',
-              'elseif method == \'POST\' then',
-              '  -- Create new user',
-              '  if not body.username then',
-              '    local response = context:response()',
-              '    response[\'status\'] = 400',
-              '    response[\'body\'] = { error = \'Username required\' }',
-              '    return',
-              '  end',
-              '',
-              '  local userId = tostring(os.time())',
-              '  users[userId] = {',
-              '    id = userId,',
-              '    username = body.username,',
-              '    created = os.time()',
-              '  }',
-              '',
-              '  local response = context:response()',
-              '  response[\'status\'] = 201',
-              '  response[\'body\'] = users[userId]',
-              'end',
-              '',
-              '-- Set common headers',
-              'local response = context:response()',
-              'response[\'headers\'] = {',
-              '  [\'Content-Type\'] = \'application/json\',',
-              '  [\'X-API-Version\'] = \'1.0\'',
-              '}'
-            ].join('\n'),
-            config: defaultConfig,
-            urlPath: '/api/users'
-          }
-        ]
-      }
-    ];
-
-    // Create sample logs
-    const sampleLogs: ExecutionLog[] = [
-      {
-        id: '1',
-        projectId: '1',
-        projectName: 'HTTP Handlers',
-        scriptName: 'get-handler.lua',
-        timestamp: new Date(Date.now() - 1000 * 60 * 5),
-        status: 'success',
-        response: '{"message":"Hello, John!","timestamp":1677689420}',
-        executionCost: 1.45,
-        memoryUsed: 32.3,
-        executionTime: 124
-      },
-      {
-        id: '2',
-        projectId: '1',
-        projectName: 'HTTP Handlers',
-        scriptName: 'post-handler.lua',
-        timestamp: new Date(Date.now() - 1000 * 60 * 15),
-        status: 'success',
-        response: '{"received":"test data","timestamp":1677689400,"processed":true}',
-        executionCost: 1.82,
-        memoryUsed: 42.1,
-        executionTime: 156
-      },
-      {
-        id: '3',
-        projectId: '2',
-        projectName: 'API Routes',
-        scriptName: 'users.lua',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30),
-        status: 'error',
-        error: 'Bad Request: Username required',
-        executionCost: 0.54,
-        memoryUsed: 28.4,
-        executionTime: 89
-      },
-      {
-        id: '4',
-        projectId: '1',
-        projectName: 'HTTP Handlers',
-        scriptName: 'get-handler.lua',
-        timestamp: new Date(Date.now() - 1000 * 60 * 45),
-        status: 'success',
-        response: '{"message":"Hello, World!","timestamp":1677689360}',
-        executionCost: 1.21,
-        memoryUsed: 31.7,
-        executionTime: 115
-      },
-      {
-        id: '5',
-        projectId: '2',
-        projectName: 'API Routes',
-        scriptName: 'users.lua',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60),
-        status: 'success',
-        response: '{"id":"1677689300","username":"testuser","created":1677689300}',
-        executionCost: 1.67,
-        memoryUsed: 45.4,
-        executionTime: 167
-      }
-    ];
-
-    setExecutionLogs(sampleLogs);
-    setProjects(sampleProjects);
-  };
-
-  const loadProjects = () => {
-    // In a real app, this would fetch from an API
-    renderProjects();
-  };
-
-  const renderProjects = () => {
-    // This will be handled by the UI components
-  };
-
-  const handleLogin = (email: string, password: string) => {
-    if (!email || !password) {
+        scripts: []
+      })));
+    } catch (error) {
+      console.error('Failed to load projects:', error);
       showAlert({
-        title: 'Validation Error',
-        message: 'Please enter both email and password',
+        title: 'Error',
+        message: 'Failed to load projects',
         type: 'error'
       });
-      return;
     }
-    
-    localStorage.setItem('loggedIn', 'true');
-    simulateLogin();
-    setIsAuthModalOpen(false);
   };
 
-  const handleRegister = (name: string, email: string, password: string, confirmPassword: string) => {
-    if (!name || !email || !password || !confirmPassword) {
+  const handleLogin = async (email: string, password: string) => {
+    try {
+      const response = await auth.login(email, password);
+      const { access_token, refresh_token } = response.data;
+      
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      
+      await simulateLogin();
+      setIsAuthModalOpen(false);
+    } catch (error) {
+      console.error('Login failed:', error);
       showAlert({
-        title: 'Validation Error',
-        message: 'Please fill in all fields',
+        title: 'Error',
+        message: 'Invalid credentials',
         type: 'error'
       });
-      return;
     }
-    
+  };
+
+  const handleRegister = async (name: string, email: string, password: string, confirmPassword: string) => {
     if (password !== confirmPassword) {
       showAlert({
         title: 'Validation Error',
@@ -384,14 +170,23 @@ const AppContent: React.FC = () => {
       });
       return;
     }
-    
-    localStorage.setItem('loggedIn', 'true');
-    simulateLogin(name, email);
-    setIsAuthModalOpen(false);
+
+    try {
+      await auth.register(email, password);
+      await handleLogin(email, password);
+    } catch (error) {
+      console.error('Registration failed:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Registration failed',
+        type: 'error'
+      });
+    }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('loggedIn');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     setCurrentUser(null);
     setProjects([]);
     setCurrentProject(null);
@@ -412,105 +207,91 @@ const AppContent: React.FC = () => {
     }));
   };
 
-  const handleCreateProject = (name: string, description: string) => {
-    if (!name) {
+  const handleCreateProject = async (name: string, description: string) => {
+    try {
+      const response = await projectsApi.create(name);
+      const newProject = {
+        id: response.data.id.toString(),
+        name: response.data.name,
+        description,
+        createdAt: new Date(),
+        scripts: []
+      };
+      
+      setProjects([...projects, newProject]);
+      setIsNewProjectModalOpen(false);
+      openProject(newProject);
+
       showAlert({
-        title: 'Validation Error',
-        message: 'Project name is required',
+        title: 'Success',
+        message: 'Project created successfully!',
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to create project',
         type: 'error'
       });
-      return;
     }
-    
-    const defaultConfig = {
-      memoryLimit: 128,
-      timeout: 30000
-    };
-    
-    const newProject = {
-      id: Date.now().toString(),
-      name,
-      description,
-      createdAt: new Date(),
-      scripts: [
-        { 
-          id: `${Date.now()}-main.lua`, 
-          name: 'main.lua', 
-          content: '-- Your Lua script here\nprint("Hello, LuaScript Hub!")',
-          config: defaultConfig,
-          urlPath: '/projects/new/scripts/main.lua'
-        }
-      ]
-    };
-    
-    setProjects([...projects, newProject]);
-    setIsNewProjectModalOpen(false);
-    openProject(newProject);
-
-    // Record script creation in history
-    addScriptChange({
-      projectId: newProject.id,
-      projectName: newProject.name,
-      scriptName: 'main.lua',
-      changeType: 'create',
-      description: 'Initial script created with new project',
-      author: currentUser?.name || 'Unknown User'
-    });
-    
-    showAlert({
-      title: 'Success',
-      message: 'Project created successfully!',
-      type: 'success'
-    });
   };
 
-  const openProject = (project: Project) => {
-    setCurrentProject(project);
-    setCurrentScript(project.scripts[0]);
+  const openProject = async (project: Project) => {
+    try {
+      const response = await scriptsApi.getAll(parseInt(project.id));
+      const scriptsData = response.data;
+      
+      const updatedProject = {
+        ...project,
+        scripts: scriptsData.map((s: any) => ({
+          id: s.id.toString(),
+          name: s.path.split('/').pop() || 'untitled.lua',
+          content: s.source_code,
+          config: {
+            memoryLimit: 128,
+            timeout: 30000
+          },
+          urlPath: s.path
+        }))
+      };
+      
+      setCurrentProject(updatedProject);
+      setCurrentScript(updatedProject.scripts[0] || null);
+    } catch (error) {
+      console.error('Failed to load project scripts:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to load project scripts',
+        type: 'error'
+      });
+    }
   };
 
-  const handleSaveScript = () => {
+  const handleSaveScript = async () => {
     if (!currentProject || !currentScript) return;
     
-    // Get the existing script to compare content
-    const existingScript = currentProject.scripts.find(s => s.id === currentScript.id);
-    const hasChanges = existingScript && existingScript.content !== currentScript.content;
-    
-    if (!hasChanges) return; // Don't save or record if no changes
+    try {
+      await scriptsApi.update(
+        parseInt(currentProject.id),
+        parseInt(currentScript.id),
+        currentScript.urlPath,
+        currentScript.content
+      );
 
-    // Update script content
-    const updatedProjects = projects.map(p => {
-      if (p.id === currentProject.id) {
-        return {
-          ...p,
-          scripts: p.scripts.map(s => 
-            s.id === currentScript.id 
-              ? { ...s, content: currentScript.content }
-              : s
-          )
-        };
-      }
-      return p;
-    });
-    
-    setProjects(updatedProjects);
-
-    // Record script modification in history
-    addScriptChange({
-      projectId: currentProject.id,
-      projectName: currentProject.name,
-      scriptName: currentScript.name,
-      changeType: 'modify',
-      description: 'Script content updated',
-      author: currentUser?.name || 'Unknown User',
-      diff: generateDiff(existingScript?.content || '', currentScript.content)
-    });
-
-    showAlert({
-      title: 'Success',
-      message: `Script ${currentScript.name} saved successfully!`,
-      type: 'success'
-    });
+      showAlert({
+        title: 'Success',
+        message: `Script ${currentScript.name} saved successfully!`,
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to save script:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to save script',
+        type: 'error'
+      });
+    }
   };
 
   const handleScriptSettingsSave = (newConfig: ScriptConfig) => {
@@ -545,45 +326,46 @@ const AppContent: React.FC = () => {
     });
   };
 
-  const handleExecuteScript = () => {
+  const handleExecuteScript = async () => {
     if (!currentProject || !currentScript) return;
     
-    // Save before executing
-    handleSaveScript();
-    
-    // Simulate API call with log creation
-    const startTime = Date.now();
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      const executionTime = Date.now() - startTime;
+    try {
+      const response = await scriptsApi.execute(
+        parseInt(currentProject.id),
+        parseInt(currentScript.id)
+      );
+
+      const executionResult = response.data;
       
-      // Simulate random success/error
-      const isSuccess = Math.random() > 0.2;
-      
+      // Add execution log
       const newLog: ExecutionLog = {
         id: Date.now().toString(),
         projectId: currentProject.id,
         projectName: currentProject.name,
         scriptName: currentScript.name,
         timestamp: new Date(),
-        status: isSuccess ? 'success' : 'error',
-        response: isSuccess ? 'Script executed successfully with output: Hello World!' : undefined,
-        error: !isSuccess ? 'Memory limit exceeded' : undefined,
-        executionCost: Math.random() * 10, // Random cost between 0-10 credits
-        memoryUsed: Math.random() * currentScript.config.memoryLimit,
-        executionTime
+        status: executionResult.status,
+        response: executionResult.response,
+        executionCost: executionResult.cost,
+        memoryUsed: executionResult.memory_used,
+        executionTime: executionResult.execution_time
       };
-      
+
       setExecutionLogs(prevLogs => [newLog, ...prevLogs]);
-      
-      // Show alert
+
       showAlert({
-        title: isSuccess ? 'Success' : 'Error',
-        message: isSuccess ? 'Script executed successfully!' : 'Script execution failed!',
-        type: isSuccess ? 'success' : 'error'
+        title: 'Success',
+        message: `Script ${currentScript.name} executed successfully!`,
+        type: 'success'
       });
-    }, 1000);
+    } catch (error) {
+      console.error('Failed to execute script:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to execute script',
+        type: 'error'
+      });
+    }
   };
 
   const handleClearLogs = (projectId?: string) => {
@@ -606,42 +388,38 @@ const AppContent: React.FC = () => {
     });
   };
 
-  const handleDeleteScript = (scriptName: string) => {
-    if (!currentProject) return;
+  const handleDeleteScript = async (scriptName: string) => {
+    if (!currentProject || !currentScript) return;
     
-    showAlert({
-      title: 'Confirm Deletion',
-      message: `Are you sure you want to delete ${scriptName}?`,
-      type: 'warning',
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      onConfirm: () => {
-        const updatedScripts = currentProject.scripts.filter(s => s.name !== scriptName);
-        setCurrentProject({
-          ...currentProject,
-          scripts: updatedScripts
-        });
-        if (currentScript?.name === scriptName) {
-          setCurrentScript(updatedScripts[0]);
-        }
-        
-        // Record script deletion in history
-        addScriptChange({
-          projectId: currentProject.id,
-          projectName: currentProject.name,
-          scriptName: scriptName,
-          changeType: 'delete',
-          description: 'Script deleted',
-          author: currentUser?.name || 'Unknown User'
-        });
+    try {
+      await scriptsApi.delete(
+        parseInt(currentProject.id),
+        parseInt(currentScript.id)
+      );
 
-        showAlert({
-          title: 'Success',
-          message: 'Script deleted successfully',
-          type: 'success'
-        });
+      const updatedScripts = currentProject.scripts.filter(s => s.name !== scriptName);
+      setCurrentProject({
+        ...currentProject,
+        scripts: updatedScripts
+      });
+      
+      if (currentScript?.name === scriptName) {
+        setCurrentScript(updatedScripts[0]);
       }
-    });
+
+      showAlert({
+        title: 'Success',
+        message: 'Script deleted successfully',
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to delete script:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to delete script',
+        type: 'error'
+      });
+    }
   };
 
   // Add handleLogoClick function
@@ -900,36 +678,119 @@ const AppContent: React.FC = () => {
   };
 
   // Add new function for project deletion
-  const handleDeleteProject = (projectId: string) => {
-    const projectToDelete = projects.find(p => p.id === projectId);
-    if (!projectToDelete) return;
-
-    showAlert({
-      title: 'Confirm Project Deletion',
-      message: `Are you sure you want to delete "${projectToDelete.name}"? This action cannot be undone.`,
-      type: 'warning',
-      confirmLabel: 'Delete',
-      cancelLabel: 'Cancel',
-      onConfirm: () => {
-        // Remove project from list
-        setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
-        
-        // Clear logs for this project
-        setExecutionLogs(prevLogs => prevLogs.filter(log => log.projectId !== projectId));
-        
-        // If current project is being deleted, reset current project and script
-        if (currentProject?.id === projectId) {
-          setCurrentProject(null);
-          setCurrentScript(null);
-        }
-
-        showAlert({
-          title: 'Success',
-          message: 'Project deleted successfully',
-          type: 'success'
-        });
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      await projectsApi.delete(parseInt(projectId));
+      setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+      
+      if (currentProject?.id === projectId) {
+        setCurrentProject(null);
+        setCurrentScript(null);
       }
-    });
+
+      showAlert({
+        title: 'Success',
+        message: 'Project deleted successfully',
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to delete project',
+        type: 'error'
+      });
+    }
+  };
+
+  const handleDragStart = (script: Script, e: React.DragEvent<HTMLDivElement>) => {
+    setDraggedScript(script);
+    // Set the drag image to be the same element
+    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
+    // Remove the clone after drag starts
+    setTimeout(() => document.body.removeChild(dragImage), 0);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    // Only allow horizontal movement
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (targetScript: Script) => {
+    if (!draggedScript || !currentProject) return;
+
+    const scripts = [...currentProject.scripts];
+    const draggedIndex = scripts.findIndex(s => s.id === draggedScript.id);
+    const targetIndex = scripts.findIndex(s => s.id === targetScript.id);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Remove dragged item and insert at target position
+    scripts.splice(draggedIndex, 1);
+    scripts.splice(targetIndex, 0, draggedScript);
+
+    const updatedProject = {
+      ...currentProject,
+      scripts
+    };
+
+    setProjects(prevProjects =>
+      prevProjects.map(p =>
+        p.id === currentProject.id ? updatedProject : p
+      )
+    );
+    setCurrentProject(updatedProject);
+    setDraggedScript(null);
+  };
+
+  const handleCreateScript = async (name: string) => {
+    if (!currentProject) return;
+    
+    try {
+      const path = `/projects/${currentProject.id}/scripts/${name}`;
+      const response = await scriptsApi.create(
+        parseInt(currentProject.id),
+        path,
+        '-- Your Lua script here\nprint("Hello, LuaScript Hub!")'
+      );
+
+      const newScript = {
+        id: response.data.id.toString(),
+        name,
+        content: response.data.source_code,
+        config: {
+          memoryLimit: 128,
+          timeout: 30000
+        },
+        urlPath: response.data.path
+      };
+
+      const updatedProject = {
+        ...currentProject,
+        scripts: [...currentProject.scripts, newScript]
+      };
+
+      setCurrentProject(updatedProject);
+      setCurrentScript(newScript);
+
+      showAlert({
+        title: 'Success',
+        message: `Script ${name} created successfully!`,
+        type: 'success'
+      });
+    } catch (error) {
+      console.error('Failed to create script:', error);
+      showAlert({
+        title: 'Error',
+        message: 'Failed to create script',
+        type: 'error'
+      });
+    }
   };
 
   return (
@@ -1207,15 +1068,32 @@ const AppContent: React.FC = () => {
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 whileHover={{ scale: 1.02 }}
                                 whileTap={{ scale: 0.98 }}
-                                className={`px-4 py-2 cursor-pointer rounded-lg transition-all duration-200 flex items-center space-x-2 flex-shrink-0 ${
+                                className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 flex-shrink-0 ${
                                   currentScript?.name === script.name
                                     ? 'bg-white shadow-md text-blue-600'
                                     : 'hover:bg-white hover:shadow-sm text-gray-600 hover:text-gray-800'
                                 }`}
                                 onClick={() => setCurrentScript(script)}
                               >
-                                <i className="fas fa-file-code text-sm opacity-70"></i>
-                                <span className="whitespace-nowrap">{script.name}</span>
+                                <div
+                                  draggable
+                                  onDragStart={(e: React.DragEvent<HTMLDivElement>) => handleDragStart(script, e)}
+                                  onDragOver={handleDragOver}
+                                  onDrop={() => handleDrop(script)}
+                                  className="flex items-center space-x-2"
+                                >
+                                  <i 
+                                    className="fas fa-grip-vertical text-sm opacity-70 mr-2 cursor-move hover:text-blue-600 transition-colors"
+                                    onMouseEnter={(e) => {
+                                      e.currentTarget.parentElement?.style.setProperty('cursor', 'move');
+                                    }}
+                                    onMouseLeave={(e) => {
+                                      e.currentTarget.parentElement?.style.setProperty('cursor', 'pointer');
+                                    }}
+                                  ></i>
+                                  <i className="fas fa-file-code text-sm opacity-70"></i>
+                                  <span className="whitespace-nowrap">{script.name}</span>
+                                </div>
                                 <div className="flex items-center space-x-2 ml-2">
                                   <button
                                     className="text-gray-400 hover:text-purple-600 transition-colors"
@@ -1391,43 +1269,7 @@ const AppContent: React.FC = () => {
         <NewScriptModal
           isOpen={isNewScriptModalOpen}
           onClose={() => setIsNewScriptModalOpen(false)}
-          onCreate={(scriptName: string, language: ScriptLanguage) => {
-            const config = LANGUAGE_CONFIGS[language];
-            const newScript = {
-              id: `${Date.now()}-${scriptName}`,
-              name: scriptName,
-              content: config.defaultContent,
-              config: {
-                memoryLimit: 128,
-                timeout: 30000
-              },
-              urlPath: `/projects/${currentProject.id}/scripts/${scriptName}`
-            };
-            
-            const updatedProject = {
-              ...currentProject,
-              scripts: [...currentProject.scripts, newScript]
-            };
-            
-            setCurrentProject(updatedProject);
-            setCurrentScript(newScript);
-
-            // Record script creation in history
-            addScriptChange({
-              projectId: currentProject.id,
-              projectName: currentProject.name,
-              scriptName: scriptName,
-              changeType: 'create',
-              description: 'New script created',
-              author: currentUser?.name || 'Unknown User'
-            });
-
-            showAlert({
-              title: 'Success',
-              message: `Script ${scriptName} created successfully!`,
-              type: 'success'
-            });
-          }}
+          onCreate={handleCreateScript}
           existingScriptNames={currentProject.scripts.map(s => s.name)}
         />
       )}
@@ -1526,7 +1368,6 @@ const App: React.FC = () => {
 
 export default App;
 
-
 <footer className="mt-auto relative">
   {/* Gradient overlay */}
   <div className="absolute inset-0 bg-gradient-to-b from-transparent via-accent-50/30 to-accent-100/40 dark:from-transparent dark:via-dark-800/50 dark:to-dark-900/60 pointer-events-none" />
@@ -1613,3 +1454,4 @@ export default App;
     </div>
   </div>
 </footer>
+
