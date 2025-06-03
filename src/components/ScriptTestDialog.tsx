@@ -168,7 +168,7 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
   };
 
   const buildUrl = () => {
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://miet-lambda.reos.fun:8081';
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://miet-lambda.reos.fun';
     const validParams = queryParams.filter(p => p.key && p.value);
     const queryString = validParams.length > 0
       ? '?' + validParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&')
