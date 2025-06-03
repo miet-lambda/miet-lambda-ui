@@ -1,6 +1,6 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
-const API_BASE_URL = 'http://miet-lambda.reos.fun/api/v1';
+const API_BASE_URL = 'http://user-miet-lambda.reos.fun/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
