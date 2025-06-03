@@ -391,35 +391,47 @@ const AppContent: React.FC = () => {
   const handleDeleteScript = async (scriptName: string) => {
     if (!currentProject || !currentScript) return;
     
-    try {
-      await scriptsApi.delete(
-        parseInt(currentProject.id),
-        parseInt(currentScript.id)
-      );
+    // Show confirmation dialog
+    showAlert({
+      title: 'Confirm Delete',
+      message: currentProject.scripts.length === 1 
+        ? 'This is the last script in the project. Deleting it will leave the project empty. Are you sure?'
+        : 'Are you sure you want to delete this script?',
+      type: 'warning',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await scriptsApi.delete(
+            parseInt(currentProject.id),
+            parseInt(currentScript.id)
+          );
 
-      const updatedScripts = currentProject.scripts.filter(s => s.name !== scriptName);
-      setCurrentProject({
-        ...currentProject,
-        scripts: updatedScripts
-      });
-      
-      if (currentScript?.name === scriptName) {
-        setCurrentScript(updatedScripts[0]);
+          const updatedScripts = currentProject.scripts.filter(s => s.name !== scriptName);
+          setCurrentProject({
+            ...currentProject,
+            scripts: updatedScripts
+          });
+          
+          if (currentScript?.name === scriptName) {
+            setCurrentScript(updatedScripts[0] || null);
+          }
+
+          showAlert({
+            title: 'Success',
+            message: 'Script deleted successfully',
+            type: 'success'
+          });
+        } catch (error) {
+          console.error('Failed to delete script:', error);
+          showAlert({
+            title: 'Error',
+            message: 'Failed to delete script',
+            type: 'error'
+          });
+        }
       }
-
-      showAlert({
-        title: 'Success',
-        message: 'Script deleted successfully',
-        type: 'success'
-      });
-    } catch (error) {
-      console.error('Failed to delete script:', error);
-      showAlert({
-        title: 'Error',
-        message: 'Failed to delete script',
-        type: 'error'
-      });
-    }
+    });
   };
 
   // Add handleLogoClick function
@@ -679,28 +691,44 @@ const AppContent: React.FC = () => {
 
   // Add new function for project deletion
   const handleDeleteProject = async (projectId: string) => {
-    try {
-      await projectsApi.delete(parseInt(projectId));
-      setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
-      
-      if (currentProject?.id === projectId) {
-        setCurrentProject(null);
-        setCurrentScript(null);
-      }
+    // Show confirmation dialog
+    showAlert({
+      title: 'Confirm Delete',
+      message: 'Are you sure you want to delete this project? This action cannot be undone.',
+      type: 'warning',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await projectsApi.delete(parseInt(projectId));
+          setProjects(prevProjects => prevProjects.filter(p => p.id !== projectId));
+          
+          if (currentProject?.id === projectId) {
+            setCurrentProject(null);
+            setCurrentScript(null);
+          }
 
-      showAlert({
-        title: 'Success',
-        message: 'Project deleted successfully',
-        type: 'success'
-      });
-    } catch (error) {
-      console.error('Failed to delete project:', error);
-      showAlert({
-        title: 'Error',
-        message: 'Failed to delete project',
-        type: 'error'
-      });
-    }
+          showAlert({
+            title: 'Success',
+            message: 'Project deleted successfully',
+            type: 'success'
+          });
+        } catch (error) {
+          console.error('Failed to delete project:', error);
+          let errorMessage = 'Failed to delete project';
+          
+          if (error instanceof Error) {
+            errorMessage = error.message;
+          }
+          
+          showAlert({
+            title: 'Error',
+            message: errorMessage,
+            type: 'error'
+          });
+        }
+      }
+    });
   };
 
   const handleDragStart = (script: Script, e: React.DragEvent<HTMLDivElement>) => {
@@ -792,6 +820,22 @@ const AppContent: React.FC = () => {
       });
     }
   };
+
+  // Add keyboard shortcut handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+S (or Cmd+S on Mac)
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault(); // Prevent browser's save dialog
+        if (currentScript && currentProject) {
+          handleSaveScript();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentScript, currentProject]); // Dependencies for the effect
 
   return (
     <div className="flex flex-col h-screen bg-gray-50 dark:bg-dark-900">
@@ -1126,18 +1170,16 @@ const AppContent: React.FC = () => {
                                   >
                                     <i className="fas fa-pencil-alt text-sm"></i>
                                   </button>
-                                  {currentProject.scripts.length > 1 && (
-                                    <button
-                                      className="text-gray-400 hover:text-red-500 transition-colors"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleDeleteScript(script.name);
-                                      }}
-                                      title="Delete Script"
-                                    >
-                                      <i className="fas fa-times"></i>
-                                    </button>
-                                  )}
+                                  <button
+                                    className="text-gray-400 hover:text-red-500 transition-colors"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteScript(script.name);
+                                    }}
+                                    title="Delete Script"
+                                  >
+                                    <i className="fas fa-times"></i>
+                                  </button>
                                 </div>
                               </motion.div>
                             ))}
@@ -1302,6 +1344,7 @@ const AppContent: React.FC = () => {
           }}
           scriptName={scriptToTest.name}
           urlPath={scriptToTest.urlPath || ''}
+          projectName={currentProject?.name}
         />
       )}
       {/* Load Script Modal */}

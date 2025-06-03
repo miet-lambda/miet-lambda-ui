@@ -1,46 +1,248 @@
-# Getting Started with Create React App
+# MIET Lambda Hub
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+MIET Lambda Hub is a modern web application for managing and executing Lua scripts in the cloud. It provides a user-friendly interface for creating projects, writing scripts, and executing them via HTTP API.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- 🔐 **Authentication System**
+  - User registration and login
+  - Secure token-based authentication
+  - Profile management
 
-### `npm start`
+- 📁 **Project Management**
+  - Create and manage multiple projects
+  - Organize scripts within projects
+  - Project deletion and cleanup
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- 📝 **Script Editor**
+  - Syntax highlighting for Lua
+  - Real-time script editing
+  - Auto-save functionality
+  - Script settings configuration
+  - Memory limit and timeout settings
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- 🔄 **Script Execution**
+  - Execute scripts directly from the editor
+  - View execution logs and results
+  - Track execution costs and resource usage
+  - Test scripts via HTTP endpoints
 
-### `npm test`
+- 🎨 **Modern UI/UX**
+  - Dark/Light theme support
+  - Responsive design
+  - Drag-and-drop script organization
+  - Keyboard shortcuts
+  - Beautiful animations and transitions
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- 📊 **Monitoring & Logging**
+  - Execution history
+  - Resource usage tracking
+  - Script change history
+  - Error logging and debugging
 
-### `npm run build`
+## Prerequisites
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Node.js (v14 or higher)
+- npm or yarn
+- Modern web browser
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Installation
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/lambda-executor-ui.git
+cd lambda-executor-ui
+```
 
-### `npm run eject`
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+3. Create a `.env` file in the root directory and add your environment variables:
+```env
+REACT_APP_API_URL=http://your-api-url:8081
+```
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Development
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+To start the development server:
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+```bash
+npm start
+# or
+yarn start
+```
 
-## Learn More
+The application will be available at `http://localhost:3000`
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Building for Production
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+To create a production build:
+
+```bash
+npm run build
+# or
+yarn build
+```
+
+The build artifacts will be stored in the `build/` directory.
+
+## Deployment with Nginx
+
+1. Build the application for production:
+```bash
+npm run build
+```
+
+2. Install Nginx (if not already installed):
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install nginx
+
+# CentOS/RHEL
+sudo yum install epel-release
+sudo yum install nginx
+```
+
+3. Create a new Nginx configuration file:
+```bash
+sudo nano /etc/nginx/sites-available/lambda-hub
+```
+
+4. Add the following configuration:
+```nginx
+server {
+    listen 80;
+    server_name miet-lambda.reos.fun.com;  # Replace with your domain
+
+    root /var/www/lambda-hub;     # Path to your build directory
+    index index.html;
+
+    # Handle React routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Cache static assets
+    location /static/ {
+        expires 1y;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # API proxy
+    location /api/ {
+        proxy_pass http://localhost:8081/;  # Your backend API URL
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Content-Type-Options "nosniff";
+}
+```
+
+5. Create a symbolic link to enable the site:
+```bash
+sudo ln -s /etc/nginx/sites-available/lambda-hub /etc/nginx/sites-enabled/
+```
+
+6. Copy the build files to the web directory:
+```bash
+sudo mkdir -p /var/www/lambda-hub
+sudo cp -r build/* /var/www/lambda-hub/
+```
+
+7. Set proper permissions:
+```bash
+sudo chown -R www-data:www-data /var/www/lambda-hub
+sudo chmod -R 755 /var/www/lambda-hub
+```
+
+8. Test Nginx configuration:
+```bash
+sudo nginx -t
+```
+
+9. Restart Nginx:
+```bash
+sudo systemctl restart nginx
+```
+
+10. (Optional) Set up SSL with Let's Encrypt:
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d miet-lambda.reos.fun.com
+```
+
+Your application should now be accessible at `http://miet-lambda.reos.fun.com` (or `https://miet-lambda.reos.fun.com` if you set up SSL).
+
+### Troubleshooting
+
+- Check Nginx error logs:
+```bash
+sudo tail -f /var/log/nginx/error.log
+```
+
+- Check Nginx access logs:
+```bash
+sudo tail -f /var/log/nginx/access.log
+```
+
+- Verify file permissions:
+```bash
+ls -la /var/www/lambda-hub
+```
+
+- Test Nginx configuration:
+```bash
+sudo nginx -t
+```
+
+## Project Structure
+
+```
+src/
+├── components/         # React components
+├── contexts/          # React contexts
+├── services/          # API services
+├── types/             # TypeScript type definitions
+├── utils/             # Utility functions
+└── App.tsx           # Main application component
+```
+
+## API Integration
+
+The application integrates with a backend API for:
+- User authentication
+- Project management
+- Script execution
+- Resource monitoring
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- [React](https://reactjs.org/)
+- [TypeScript](https://www.typescriptlang.org/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Framer Motion](https://www.framer.com/motion/)
+- [Font Awesome](https://fontawesome.com/)

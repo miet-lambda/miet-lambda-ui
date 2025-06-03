@@ -27,12 +27,6 @@ const ScriptUrlConfig: React.FC<ScriptUrlConfigProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validation
-    if (!path.startsWith('/')) {
-      setError('Path must start with /');
-      return;
-    }
-
     if (path.includes('//')) {
       setError('Path cannot contain consecutive slashes');
       return;

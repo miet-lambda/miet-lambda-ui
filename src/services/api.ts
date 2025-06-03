@@ -1,6 +1,6 @@
 import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
-const API_BASE_URL = 'http://135.181.170.148:8080/api/v1';
+const API_BASE_URL = 'http://miet-lambda.reos.fun/api/v1';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -98,8 +98,23 @@ export const projects = {
   update: (projectId: number, name: string) =>
     api.put(`/projects/${projectId}`, { name }),
   
-  delete: (projectId: number) =>
-    api.delete(`/projects/${projectId}`),
+  delete: async (projectId: number) => {
+    try {
+      const response = await api.delete(`/projects/${projectId}`);
+      return response;
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        if (error.response?.status === 404) {
+          throw new Error('Project not found');
+        } else if (error.response?.status === 403) {
+          throw new Error('You do not have permission to delete this project');
+        } else if (error.response?.status === 401) {
+          throw new Error('Please log in to delete projects');
+        }
+      }
+      throw error;
+    }
+  },
 };
 
 // Script endpoints
@@ -114,7 +129,7 @@ export const scripts = {
     api.post(`/projects/${projectId}/scripts`, { path, source_code: sourceCode }),
   
   update: (projectId: number, scriptId: number, path: string, sourceCode: string) =>
-    api.put(`/projects/${projectId}/scripts/${scriptId}`, { path, source_code: sourceCode }),
+    api.put(`/projects/${projectId}/scripts/${scriptId}`, { path: path, source_code: sourceCode }),
   
   delete: (projectId: number, scriptId: number) =>
     api.delete(`/projects/${projectId}/scripts/${scriptId}`),

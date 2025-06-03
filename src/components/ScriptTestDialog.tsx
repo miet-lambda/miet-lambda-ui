@@ -1,17 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
 
 interface ScriptTestDialogProps {
   isOpen: boolean;
   onClose: () => void;
   scriptName: string;
   urlPath: string;
-}
-
-interface TestResponse {
-  status: number;
-  data: any;
-  executionTime: number;
-  memoryUsed: number;
+  projectName?: string;
 }
 
 interface Header {
@@ -25,7 +20,14 @@ interface QueryParam {
 }
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-type ContentType = 'application/json' | 'text/plain' | 'application/x-www-form-urlencoded' | 'multipart/form-data';
+
+interface SavedRequestState {
+  requestMethod: RequestMethod;
+  contentType: string;
+  requestBody: string;
+  headers: Header[];
+  queryParams: QueryParam[];
+}
 
 const SCROLLBAR_STYLES = `
   /* Custom Scrollbar Styles */
@@ -55,75 +57,87 @@ const SCROLLBAR_STYLES = `
     scrollbar-color: #d1d5db #f1f1f1;
   }
   
-  /* For horizontal scrollbars */
-  .custom-scrollbar-x::-webkit-scrollbar {
-    height: 8px;
+  /* Dark mode scrollbar */
+  .dark .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1f2937;
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563;
+  }
+  
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #6b7280;
+  }
+  
+  .dark .custom-scrollbar {
+    scrollbar-color: #4b5563 #1f2937;
   }
 `;
-
-const TabButton: React.FC<{
-  active: boolean;
-  onClick: () => void;
-  icon: string;
-  label: string;
-}> = ({ active, onClick, icon, label }) => (
-  <button
-    onClick={onClick}
-    className={`px-4 py-3 text-sm font-medium transition-all duration-200 flex items-center space-x-2 rounded-lg border ${
-      active
-        ? 'text-purple-600 bg-purple-50 border-purple-200 shadow-sm'
-        : 'text-gray-600 hover:text-purple-600 hover:bg-purple-50 hover:border-purple-100 border-transparent'
-    }`}
-  >
-    <i className={`fas fa-${icon} ${active ? 'text-purple-500' : 'text-gray-400'}`}></i>
-    <span>{label}</span>
-  </button>
-);
-
-const highlightShellCommand = (command: string) => {
-  // Split the command into lines
-  return command.split('\n').map((line, i) => {
-    // Highlight different parts of the command
-    const parts = line.split(' ').map((part, j) => {
-      if (j === 0 && i === 0) {
-        // First word of first line (curl)
-        return `<span class="text-purple-600">${part}</span>`;
-      } else if (part.startsWith('-')) {
-        // Options/flags
-        return `<span class="text-blue-600">${part}</span>`;
-      } else if (part.startsWith('"')) {
-        // Quoted strings
-        return `<span class="text-green-600">${part}</span>`;
-      } else if (part.includes(':')) {
-        // Headers
-        return `<span class="text-orange-600">${part}</span>`;
-      }
-      return part;
-    }).join(' ');
-
-    // Add continuation symbol for multiline
-    if (i < command.split('\n').length - 1) {
-      return parts + `<span class="text-gray-500">\\</span>`;
-    }
-    return parts;
-  }).join('\n');
-};
 
 const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
   isOpen,
   onClose,
   scriptName,
   urlPath,
+  projectName
 }) => {
-  const [requestMethod, setRequestMethod] = useState<RequestMethod>('POST');
-  const [contentType, setContentType] = useState<ContentType>('application/json');
-  const [requestBody, setRequestBody] = useState('{\n  \n}');
-  const [headers, setHeaders] = useState<Header[]>([{ key: '', value: '' }]);
-  const [queryParams, setQueryParams] = useState<QueryParam[]>([{ key: '', value: '' }]);
-  const [response, setResponse] = useState<TestResponse | null>(null);
+  const storageKey = `test-request-${projectName}-${scriptName}`;
+
+  // Load initial state from localStorage
+  const loadSavedState = (): SavedRequestState | null => {
+    const savedState = localStorage.getItem(storageKey);
+    if (savedState) {
+      try {
+        return JSON.parse(savedState);
+      } catch (err) {
+        console.error('Failed to load saved request state:', err);
+      }
+    }
+    return null;
+  };
+
+  const savedState = loadSavedState();
+
+  const [response, setResponse] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contentType, setContentType] = useState(savedState?.contentType || 'application/json');
+  const [requestMethod, setRequestMethod] = useState<RequestMethod>(savedState?.requestMethod || 'POST');
+  const [requestBody, setRequestBody] = useState(savedState?.requestBody || '{\n  \n}');
+  const [headers, setHeaders] = useState<Header[]>(savedState?.headers || [{ key: '', value: '' }]);
+  const [queryParams, setQueryParams] = useState<QueryParam[]>(savedState?.queryParams || [{ key: '', value: '' }]);
   const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'params'>('body');
+  const [responseWidth, setResponseWidth] = useState(400);
+  const isResizing = useRef(false);
+  const lastX = useRef(0);
+  const responseRef = useRef<HTMLDivElement>(null);
+
+  // Save state whenever it changes
+  useEffect(() => {
+    const stateToSave: SavedRequestState = {
+      requestMethod,
+      contentType,
+      requestBody,
+      headers,
+      queryParams
+    };
+    localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+  }, [requestMethod, contentType, requestBody, headers, queryParams, storageKey]);
+
+  // Handle dialog close
+  const handleClose = () => {
+    // Save state one last time before closing
+    const stateToSave: SavedRequestState = {
+      requestMethod,
+      contentType,
+      requestBody,
+      headers,
+      queryParams
+    };
+    localStorage.setItem(storageKey, JSON.stringify(stateToSave));
+    onClose();
+  };
 
   const handleAddHeader = () => {
     setHeaders([...headers, { key: '', value: '' }]);
@@ -154,32 +168,18 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
   };
 
   const buildUrl = () => {
-    const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000';
+    const baseUrl = process.env.REACT_APP_API_URL || 'http://miet-lambda.reos.fun:8081';
     const validParams = queryParams.filter(p => p.key && p.value);
     const queryString = validParams.length > 0
       ? '?' + validParams.map(p => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`).join('&')
       : '';
-    return `${baseUrl}${urlPath}${queryString}`;
-  };
-
-  const validateRequestBody = () => {
-    if (contentType === 'application/json' && requestBody.trim()) {
-      try {
-        JSON.parse(requestBody);
-      } catch (err) {
-        throw new Error('Invalid JSON format');
-      }
-    }
+    return `${baseUrl}/${projectName}/${urlPath}${queryString}`;
   };
 
   const handleTest = async () => {
     setIsLoading(true);
     setError(null);
-    setResponse(null);
-
     try {
-      validateRequestBody();
-
       const validHeaders = headers
         .filter(h => h.key && h.value)
         .reduce((acc, h) => ({ ...acc, [h.key]: h.value }), {});
@@ -189,7 +189,8 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
         headers: {
           ...validHeaders,
           'Content-Type': contentType,
-        },
+          'Accept': contentType
+        }
       };
 
       if (requestMethod !== 'GET' && requestBody.trim()) {
@@ -197,16 +198,10 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
       }
 
       const response = await fetch(buildUrl(), requestOptions);
-      const data = await response.json();
-      
-      setResponse({
-        status: response.status,
-        data: data,
-        executionTime: data.executionTime || 0,
-        memoryUsed: data.memoryUsed || 0,
-      });
+      const data = await response.text();
+      setResponse(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An error occurred');
+      setError(err instanceof Error ? err.message : 'Failed to execute script');
     } finally {
       setIsLoading(false);
     }
@@ -238,22 +233,53 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
     return command;
   };
 
+  const handleCopyCurl = () => {
+    navigator.clipboard.writeText(generateCurlCommand());
+  };
+
+  // Handle sidebar resizing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing.current) return;
+      
+      const dx = e.clientX - lastX.current;
+      const newWidth = responseWidth - dx;
+      
+      if (newWidth >= 200 && newWidth <= 800) {
+        setResponseWidth(newWidth);
+        lastX.current = e.clientX;
+      }
+    };
+
+    const handleMouseUp = () => {
+      isResizing.current = false;
+      document.body.style.cursor = 'default';
+      document.body.style.userSelect = 'auto';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [responseWidth]);
+
+  const startResize = (e: React.MouseEvent) => {
+    isResizing.current = true;
+    lastX.current = e.clientX;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   const renderRequestConfig = () => {
     switch (activeTab) {
       case 'headers':
         return (
-          <div className="flex-1">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-sm font-medium text-gray-700">Headers</h4>
-              <button
-                onClick={handleAddHeader}
-                className="text-sm text-purple-600 hover:text-purple-700 transition-colors"
-              >
-                + Add Header
-              </button>
-            </div>
+          <div className="space-y-4">
             {headers.map((header, index) => (
-              <div key={index} className="flex space-x-2 mb-2">
+              <div key={index} className="flex space-x-2">
                 <input
                   type="text"
                   value={header.key}
@@ -276,23 +302,20 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
                 </button>
               </div>
             ))}
+            <button
+              onClick={handleAddHeader}
+              className="text-sm text-purple-600 hover:text-purple-700 transition-colors"
+            >
+              + Add Header
+            </button>
           </div>
         );
       
       case 'params':
         return (
-          <div className="flex-1">
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-sm font-medium text-gray-700">Query Parameters</h4>
-              <button
-                onClick={handleAddQueryParam}
-                className="text-sm text-purple-600 hover:text-purple-700 transition-colors"
-              >
-                + Add Parameter
-              </button>
-            </div>
+          <div className="space-y-4">
             {queryParams.map((param, index) => (
-              <div key={index} className="flex space-x-2 mb-2">
+              <div key={index} className="flex space-x-2">
                 <input
                   type="text"
                   value={param.key}
@@ -315,30 +338,23 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
                 </button>
               </div>
             ))}
+            <button
+              onClick={handleAddQueryParam}
+              className="text-sm text-purple-600 hover:text-purple-700 transition-colors"
+            >
+              + Add Parameter
+            </button>
           </div>
         );
       
       default: // body tab
         return (
-          <div className="flex-1">
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Request Body</h4>
-            <div className="relative">
-              <textarea
-                value={requestBody}
-                onChange={(e) => setRequestBody(e.target.value)}
-                className="w-full h-64 font-mono text-sm p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                placeholder={contentType === 'application/json' ? 'Enter JSON body' : 'Enter request body'}
-              />
-              <div className="absolute bottom-2 right-2">
-                <button
-                  onClick={() => setRequestBody(contentType === 'application/json' ? '{\n  \n}' : '')}
-                  className="text-xs text-gray-500 hover:text-purple-600 transition-colors"
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
-          </div>
+          <textarea
+            value={requestBody}
+            onChange={(e) => setRequestBody(e.target.value)}
+            className="w-full h-32 font-mono text-sm p-4 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            placeholder={contentType === 'application/json' ? 'Enter JSON body' : 'Enter request body'}
+          />
         );
     }
   };
@@ -346,46 +362,46 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <style>{SCROLLBAR_STYLES}</style>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col transform transition-all duration-300 scale-100 opacity-100">
-        {/* Header */}
-        <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white rounded-t-2xl">
-          <div className="flex items-center space-x-4">
-            <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-3 rounded-xl shadow-lg">
-              <i className="fas fa-flask text-white text-xl"></i>
-            </div>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="bg-white dark:bg-dark-800 rounded-xl shadow-xl w-full max-w-6xl h-[80vh] flex flex-col"
+      >
+        <div className="p-6 border-b border-gray-200 dark:border-dark-700">
+          <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-2xl font-semibold text-gray-800 mb-1">
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                 Test Script
               </h3>
-              <p className="text-sm text-gray-500">{scriptName}</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                {projectName && `${projectName} / `}{scriptName}
+              </p>
             </div>
+            <button
+              onClick={handleClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            >
+              <i className="fas fa-times"></i>
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors p-2 hover:bg-gray-100 rounded-lg"
-          >
-            <i className="fas fa-times text-lg"></i>
-          </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 p-8 flex space-x-6 overflow-hidden bg-gray-50">
-          {/* Request Panel */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-xl shadow-lg border border-gray-100">
-            {/* Fixed header section with tabs */}
-            <div className="px-6 pt-6 bg-white border-b border-gray-100">
-              {/* Method and Content Type Selection */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left side - Request configuration */}
+          <div className="flex-1 p-6 overflow-y-auto custom-scrollbar">
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Request Method
                   </label>
                   <select
                     value={requestMethod}
                     onChange={(e) => setRequestMethod(e.target.value as RequestMethod)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-dark-700 dark:text-white"
                   >
                     {['GET', 'POST', 'PUT', 'DELETE', 'PATCH'].map(method => (
                       <option key={method} value={method}>{method}</option>
@@ -393,200 +409,120 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Content Type
                   </label>
                   <select
                     value={contentType}
-                    onChange={(e) => setContentType(e.target.value as ContentType)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                    onChange={(e) => setContentType(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-dark-700 dark:text-white"
                   >
-                    <option value="application/json">JSON</option>
-                    <option value="text/plain">Plain Text</option>
-                    <option value="application/x-www-form-urlencoded">Form URL Encoded</option>
-                    <option value="multipart/form-data">Multipart Form Data</option>
+                    <option value="application/json">application/json</option>
+                    <option value="application/xml">application/xml</option>
+                    <option value="text/plain">text/plain</option>
+                    <option value="text/html">text/html</option>
                   </select>
                 </div>
               </div>
 
-              {/* Request Configuration Tabs */}
-              <div className="flex space-x-2">
-                <TabButton
-                  active={activeTab === 'body'}
+              <div className="flex space-x-2 border-b border-gray-200 dark:border-dark-700">
+                <button
                   onClick={() => setActiveTab('body')}
-                  icon="code"
-                  label="Body"
-                />
-                <TabButton
-                  active={activeTab === 'headers'}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === 'body'
+                      ? 'text-purple-600 border-b-2 border-purple-600'
+                      : 'text-gray-500 hover:text-purple-600'
+                  }`}
+                >
+                  Body
+                </button>
+                <button
                   onClick={() => setActiveTab('headers')}
-                  icon="list"
-                  label="Headers"
-                />
-                <TabButton
-                  active={activeTab === 'params'}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === 'headers'
+                      ? 'text-purple-600 border-b-2 border-purple-600'
+                      : 'text-gray-500 hover:text-purple-600'
+                  }`}
+                >
+                  Headers
+                </button>
+                <button
                   onClick={() => setActiveTab('params')}
-                  icon="link"
-                  label="Params"
-                />
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    activeTab === 'params'
+                      ? 'text-purple-600 border-b-2 border-purple-600'
+                      : 'text-gray-500 hover:text-purple-600'
+                  }`}
+                >
+                  Query Params
+                </button>
               </div>
-            </div>
 
-            {/* Scrollable content area */}
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-              {/* Request Configuration Content */}
-              <div className="mb-6">
+              <div className="mt-4">
                 {renderRequestConfig()}
               </div>
 
-              {/* Curl Command */}
-              <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                    <i className="fas fa-terminal text-gray-400"></i>
-                    <span>Curl Command</span>
-                  </h4>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(generateCurlCommand());
-                    }}
-                    className="text-sm text-purple-600 hover:text-purple-700 transition-colors flex items-center space-x-2 px-3 py-1.5 rounded-lg hover:bg-purple-50"
-                  >
-                    <i className="fas fa-copy"></i>
-                    <span>Copy</span>
-                  </button>
-                </div>
-                <div className="font-mono text-sm bg-white p-4 rounded-lg border border-gray-200 overflow-x-auto whitespace-pre shadow-inner custom-scrollbar custom-scrollbar-x">
-                  <div 
-                    dangerouslySetInnerHTML={{ 
-                      __html: highlightShellCommand(generateCurlCommand()) 
-                    }}
-                  />
-                </div>
+              <div className="flex space-x-4">
+                <button
+                  onClick={handleTest}
+                  disabled={isLoading}
+                  className={`${
+                    isLoading
+                      ? 'bg-purple-400 cursor-not-allowed'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  } text-white px-6 py-2 rounded-lg transition-colors flex items-center space-x-2`}
+                >
+                  {isLoading ? (
+                    <>
+                      <i className="fas fa-spinner fa-spin"></i>
+                      <span>Testing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="fas fa-play"></i>
+                      <span>Test Script</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleCopyCurl}
+                  className="bg-gray-100 hover:bg-gray-200 dark:bg-dark-700 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-300 px-4 py-2 rounded-lg transition-colors flex items-center space-x-2"
+                >
+                  <i className="fas fa-terminal"></i>
+                  <span>Copy cURL</span>
+                </button>
               </div>
             </div>
-
-            {/* Test Button */}
-            <div className="p-6 border-t border-gray-100">
-              <button
-                onClick={handleTest}
-                disabled={isLoading}
-                className={`${
-                  isLoading
-                    ? 'bg-purple-400 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800'
-                } text-white px-6 py-3 rounded-xl transition-all duration-200 flex items-center justify-center space-x-2 w-full shadow-lg hover:shadow-xl transform hover:-translate-y-0.5`}
-              >
-                {isLoading ? (
-                  <>
-                    <i className="fas fa-spinner fa-spin"></i>
-                    <span>Testing...</span>
-                  </>
-                ) : (
-                  <>
-                    <i className="fas fa-play"></i>
-                    <span>Test Script</span>
-                  </>
-                )}
-              </button>
-            </div>
           </div>
 
-          {/* Response Panel */}
-          <div className="flex-1 flex flex-col overflow-hidden bg-white rounded-xl shadow-lg border border-gray-100">
-            <div className="p-6 border-b border-gray-100">
-              <h4 className="text-sm font-medium text-gray-700 flex items-center space-x-2">
-                <i className="fas fa-reply text-gray-400"></i>
-                <span>Response</span>
-              </h4>
-            </div>
-            <div className="flex-1 overflow-hidden p-6">
-              {error ? (
-                <div className="p-6 bg-red-50 text-red-600 rounded-xl border border-red-100 flex items-start space-x-3">
-                  <i className="fas fa-exclamation-circle mt-0.5"></i>
-                  <div>
-                    <div className="font-medium mb-1">Error</div>
-                    <div className="text-sm text-red-500">{error}</div>
-                  </div>
-                </div>
-              ) : response ? (
-                <div className="h-full flex flex-col">
-                  <div className="bg-gray-50 p-4 rounded-t-xl border border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium px-3 py-1 rounded-lg ${
-                        response.status >= 200 && response.status < 300
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-red-100 text-red-700'
-                      }`}>
-                        Status: {response.status}
-                      </span>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span className="flex items-center space-x-1">
-                          <i className="fas fa-memory"></i>
-                          <span>{response.memoryUsed.toFixed(2)} MB</span>
-                        </span>
-                        <span className="flex items-center space-x-1">
-                          <i className="fas fa-clock"></i>
-                          <span>{response.executionTime.toFixed(2)} ms</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex-1 overflow-auto bg-gray-50 p-4 rounded-b-xl border-x border-b border-gray-200 custom-scrollbar">
-                    <pre className="whitespace-pre-wrap font-mono text-sm text-gray-700">
-                      {JSON.stringify(response.data, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full flex items-center justify-center text-gray-400">
-                  <div className="text-center">
-                    <i className="fas fa-terminal text-4xl mb-3"></i>
-                    <div className="text-sm">Response will appear here</div>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Resize handle */}
+          <div
+            className="w-1 bg-gray-200 dark:bg-dark-700 cursor-col-resize hover:bg-purple-500 hover:bg-opacity-50 transition-colors"
+            onMouseDown={startResize}
+          />
+
+          {/* Right side - Response */}
+          <div
+            ref={responseRef}
+            style={{ width: responseWidth }}
+            className="bg-gray-50 dark:bg-dark-900 p-6 overflow-y-auto custom-scrollbar"
+          >
+            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
+              Response
+            </h4>
+            {error ? (
+              <div className="text-red-600 dark:text-red-400">{error}</div>
+            ) : (
+              <pre className="bg-white dark:bg-dark-800 p-4 rounded-lg overflow-x-auto font-mono text-sm custom-scrollbar">
+                {response || 'No response yet'}
+              </pre>
+            )}
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
-
-const customPrismStyles = `
-  /* Override Prism.js styles for better integration */
-  pre[class*="language-"] {
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    overflow: visible;
-  }
-  
-  code[class*="language-"] {
-    text-shadow: none;
-    padding: 0;
-  }
-  
-  .token.function {
-    color: #6366f1;
-  }
-  
-  .token.string {
-    color: #059669;
-  }
-  
-  .token.operator {
-    color: #4f46e5;
-  }
-  
-  .token.parameter {
-    color: #7c3aed;
-  }
-  
-  .token.url {
-    color: #2563eb;
-  }
-`;
 
 export default ScriptTestDialog; 
