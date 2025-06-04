@@ -22,6 +22,7 @@ import { auth, projects as projectsApi, scripts as scriptsApi } from './services
 interface User {
   name: string;
   email: string;
+  id: number;
 }
 
 interface Script {
@@ -99,7 +100,8 @@ const AppContent: React.FC = () => {
       const userData = response.data;
       setCurrentUser({
         name: userData.login,
-        email: userData.login
+        email: userData.login,
+        id: userData.id
       });
       loadProjects();
     } catch (error) {

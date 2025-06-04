@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence, MotionValue, useMotionValue, useTransform, useSpring } from 'framer-motion';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import BalanceDisplay from './BalanceDisplay';
 
 interface User {
   name: string;
   email: string;
+  id: number;
 }
 
 interface ProfilePageProps {
@@ -12,56 +14,29 @@ interface ProfilePageProps {
   onUpdateProfile: (name: string, email: string) => void;
 }
 
-interface StatCardProps {
+const StatCard: React.FC<{
   label: string;
   value: number;
   icon: string;
   delay: number;
-}
-
-const StatCard: React.FC<StatCardProps> = ({ label, value, icon, delay }) => {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ 
-        duration: 0.5,
-        delay,
-        type: "spring",
-        stiffness: 100
-      }}
-      whileHover={{ 
-        scale: 1.05,
-        transition: { type: "spring", stiffness: 300 }
-      }}
-      className="bg-gradient-to-br from-white to-gray-50 dark:from-dark-800 dark:to-dark-900 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all duration-300 dark:shadow-dark-900/50"
-    >
-      <div className="flex items-center space-x-4">
-        <motion.div 
-          className="bg-blue-100 dark:bg-blue-500/10 rounded-lg p-3"
-          whileHover={{ rotate: 360 }}
-          transition={{ duration: 0.5 }}
-        >
-          <i className={`fas ${icon} text-blue-600 dark:text-blue-400 text-xl`}></i>
-        </motion.div>
-        <div>
-          <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">{label}</div>
-          <motion.div 
-            className="text-3xl font-bold text-gray-800 dark:text-gray-100"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ 
-              duration: 0.5,
-              delay: delay + 0.2
-            }}
-          >
-            {value}
-          </motion.div>
-        </div>
+}> = ({ label, value, icon, delay }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay }}
+    className="bg-white dark:bg-dark-800/50 rounded-xl shadow-sm p-6 backdrop-blur-lg bg-opacity-80 dark:shadow-dark-900/50"
+  >
+    <div className="flex items-center space-x-4">
+      <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+        <i className={`fas ${icon} text-purple-600 dark:text-purple-400 text-xl`}></i>
       </div>
-    </motion.div>
-  );
-};
+      <div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">{label}</p>
+        <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+      </div>
+    </div>
+  </motion.div>
+);
 
 const ProfilePage: React.FC<ProfilePageProps> = ({ user, onClose, onUpdateProfile }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -79,10 +54,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, onClose, onUpdateProfil
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-dark-900 dark:via-dark-800 dark:to-dark-950 py-12"
+      className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-dark-900 dark:via-dark-800 dark:to-dark-950 py-12 overflow-y-auto"
     >
       <motion.div 
-        className="max-w-4xl mx-auto px-4"
+        className="max-w-4xl mx-auto px-4 pb-20"
         initial={{ y: 20 }}
         animate={{ y: 0 }}
         transition={{ duration: 0.5 }}
@@ -98,7 +73,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, onClose, onUpdateProfil
           </motion.h1>
           <motion.button
             whileHover={{ scale: 1.1, rotate: 90 }}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.95 }}
             onClick={onClose}
             className="text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
           >
@@ -124,6 +99,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ user, onClose, onUpdateProfil
               <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">{user.name}</h2>
               <p className="text-gray-600 dark:text-gray-400">{user.email}</p>
             </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="mb-8"
+          >
+            <BalanceDisplay userId={user.id} />
           </motion.div>
 
           <AnimatePresence mode="wait">
