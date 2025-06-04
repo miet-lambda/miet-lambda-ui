@@ -1,19 +1,18 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import AnimatedModal from './AnimatedModal';
-import { ScriptLanguage, LANGUAGE_CONFIGS } from '../types/script';
 import Icon from './Icon';
 
 interface NewScriptModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onCreate: (name: string, language: ScriptLanguage) => void;
+  onCreate: (name: string) => void;
   existingScriptNames?: string[];
+  projectName?: string;
 }
 
-const NewScriptModal: React.FC<NewScriptModalProps> = ({ isOpen, onClose, onCreate, existingScriptNames = [] }) => {
+const NewScriptModal: React.FC<NewScriptModalProps> = ({ isOpen, onClose, onCreate, existingScriptNames = [], projectName }) => {
   const [scriptName, setScriptName] = useState('');
-  const [language, setLanguage] = useState<ScriptLanguage>('lua');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -22,17 +21,17 @@ const NewScriptModal: React.FC<NewScriptModalProps> = ({ isOpen, onClose, onCrea
     setError('');
 
     let finalName = scriptName.trim();
-    const config = LANGUAGE_CONFIGS[language];
 
     if (!finalName) {
       setError('Script name is required');
       return;
     }
 
-    // Add extension if not provided
-    if (!finalName.endsWith(config.extension)) {
-      finalName += config.extension;
-    }
+    // Remove any file extension if present
+    finalName = finalName.replace(/\.[^/.]+$/, '');
+
+    // Add .lua extension
+    finalName = `${finalName}.lua`;
 
     // Check for duplicate names
     if (existingScriptNames.includes(finalName)) {
@@ -42,7 +41,7 @@ const NewScriptModal: React.FC<NewScriptModalProps> = ({ isOpen, onClose, onCrea
 
     setIsSubmitting(true);
     try {
-      await onCreate(finalName, language);
+      await onCreate(finalName);
       setScriptName('');
       onClose();
     } catch (err) {
@@ -66,36 +65,11 @@ const NewScriptModal: React.FC<NewScriptModalProps> = ({ isOpen, onClose, onCrea
             value={scriptName}
             onChange={(e) => setScriptName(e.target.value)}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
-            placeholder={`my-script${LANGUAGE_CONFIGS[language].extension}`}
+            placeholder="my-script"
           />
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-3 mt-6"
-        >
-          <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-          <div className="grid grid-cols-3 gap-4">
-            {(Object.keys(LANGUAGE_CONFIGS) as ScriptLanguage[]).map((lang) => (
-              <motion.button
-                key={lang}
-                type="button"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => setLanguage(lang)}
-                className={`flex items-center justify-center p-4 rounded-lg border ${
-                  language === lang
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                    : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                <Icon name={LANGUAGE_CONFIGS[lang].icon} className="w-5 h-5 mr-3" />
-                <span className="capitalize text-base">{lang}</span>
-              </motion.button>
-            ))}
-          </div>
+          <p className="text-sm text-gray-500">
+            The script will be accessible at: <code className="px-1 py-0.5 bg-gray-100 rounded">/{projectName}/{scriptName.trim() || 'my-script'}</code>
+          </p>
         </motion.div>
 
         {error && (

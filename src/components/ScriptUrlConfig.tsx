@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import AnimatedModal from './AnimatedModal';
 
 interface ScriptUrlConfigProps {
   isOpen: boolean;
   onClose: () => void;
   urlPath: string;
-  onSave: (urlPath: string) => void;
+  onSave: (newPath: string) => void;
   projectId: string;
   scriptName: string;
 }
@@ -17,121 +19,107 @@ const ScriptUrlConfig: React.FC<ScriptUrlConfigProps> = ({
   projectId,
   scriptName
 }) => {
-  const [path, setPath] = useState(urlPath);
-  const [error, setError] = useState<string | null>(null);
+  // Remove .lua extension from script name for display
+  const displayScriptName = scriptName.replace(/\.lua$/, '');
+  
+  // Get the current path without the project ID and script name
+  const getCurrentPath = () => {
+    const parts = urlPath.split('/');
+    const projectIndex = parts.indexOf(projectId);
+    if (projectIndex !== -1 && parts[projectIndex + 1]) {
+      return parts.slice(projectIndex + 2).join('/');
+    }
+    return '';
+  };
 
-  useEffect(() => {
-    setPath(urlPath);
-  }, [urlPath]);
+  const [path, setPath] = useState(getCurrentPath());
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
 
-    if (path.includes('//')) {
-      setError('Path cannot contain consecutive slashes');
+    // Validate path
+    if (path.includes('..')) {
+      setError('Invalid path: cannot use parent directory references');
       return;
     }
 
-    if (!/^[a-zA-Z0-9\-_\/]+$/.test(path)) {
-      setError('Path can only contain letters, numbers, hyphens, underscores, and forward slashes');
-      return;
-    }
+    // Clean up path
+    const cleanPath = path
+      .split('/')
+      .filter(Boolean)
+      .join('/');
 
-    onSave(path);
-    onClose();
+    // Construct new URL path
+    const newPath = `/${projectId}/${cleanPath || displayScriptName}`;
+    onSave(newPath);
   };
-
-  const generateDefaultPath = () => {
-    const safeName = scriptName.replace('.lua', '').toLowerCase();
-    const newPath = `/projects/${projectId}/scripts/${safeName}`;
-    setPath(newPath);
-    setError(null);
-  };
-
-  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
-        {/* Header */}
-        <div className="px-6 py-4 border-b flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <i className="fas fa-link text-blue-600 text-lg"></i>
+    <AnimatedModal isOpen={isOpen} onClose={onClose} title="Configure URL Path">
+      <form onSubmit={handleSubmit} className="space-y-6 p-6">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Current URL Path
+            </label>
+            <div className="px-4 py-2 bg-gray-50 dark:bg-dark-700 rounded-lg text-sm text-gray-600 dark:text-gray-400">
+              {urlPath}
             </div>
-            <h3 className="text-xl font-semibold text-gray-800">Configure URL Path</h3>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <i className="fas fa-times"></i>
-          </button>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              New URL Path
+            </label>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500 dark:text-gray-400">/{projectId}/</span>
+              <input
+                type="text"
+                value={path}
+                onChange={(e) => setPath(e.target.value)}
+                placeholder={displayScriptName}
+                className="flex-1 px-4 py-2 border border-gray-300 dark:border-dark-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-dark-700 dark:text-white"
+              />
+            </div>
+            <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+              Leave empty to use script name: <code className="px-1 py-0.5 bg-gray-100 dark:bg-dark-600 rounded">{displayScriptName}</code>
+            </p>
+          </div>
+
+          {error && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-red-600 dark:text-red-400 text-sm"
+            >
+              {error}
+            </motion.p>
+          )}
         </div>
 
-        {/* Content */}
-        <form onSubmit={handleSubmit}>
-          <div className="p-6">
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="urlPath">
-                URL Path
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  id="urlPath"
-                  value={path}
-                  onChange={(e) => {
-                    setPath(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder="/projects/123/scripts/example"
-                  className={`w-full px-4 py-2 rounded-lg border ${
-                    error ? 'border-red-300' : 'border-gray-300'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
-                />
-                <button
-                  type="button"
-                  onClick={generateDefaultPath}
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-blue-600 transition-colors"
-                  title="Generate default path"
-                >
-                  <i className="fas fa-magic"></i>
-                </button>
-              </div>
-              {error && (
-                <p className="mt-2 text-sm text-red-600 flex items-center">
-                  <i className="fas fa-exclamation-circle mr-2"></i>
-                  {error}
-                </p>
-              )}
-              <p className="mt-2 text-sm text-gray-500">
-                <i className="fas fa-info-circle mr-2"></i>
-                This path will be used to access your script via HTTP requests
-              </p>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 rounded-b-xl flex justify-end space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 flex items-center space-x-2"
-            >
-              <i className="fas fa-save"></i>
-              <span>Save Path</span>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200 dark:border-dark-700">
+          <motion.button
+            type="button"
+            onClick={onClose}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="px-6 py-2.5 text-red-600 hover:text-white hover:bg-red-600 rounded-lg transition-all duration-200 text-base font-medium"
+          >
+            Cancel
+          </motion.button>
+          <motion.button
+            type="submit"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            className="px-6 py-2.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-all duration-200 text-base font-medium"
+          >
+            Save
+          </motion.button>
+        </div>
+      </form>
+    </AnimatedModal>
   );
 };
 

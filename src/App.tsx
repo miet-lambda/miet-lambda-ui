@@ -782,11 +782,24 @@ const AppContent: React.FC = () => {
     if (!currentProject) return;
     
     try {
-      const path = `/projects/${currentProject.id}/scripts/${name}`;
+      // Remove .lua extension for URL path
+      const urlPath = name.replace(/\.lua$/, '');
+      const path = `${urlPath}`;
+      
       const response = await scriptsApi.create(
         parseInt(currentProject.id),
         path,
-        '-- Your Lua script here\nprint("Hello, LuaScript Hub!")'
+        `local client = require('miet.http.client').get()
+local response, err = client:post('https://auth-service.com/login', {
+  body = {
+    username = 'user',
+    password = 'secret'
+  }
+})
+if err then
+  -- Обработка ошибки
+end
+local token = json.decode(response['body']).token`
       );
 
       const newScript = {
@@ -840,7 +853,7 @@ const AppContent: React.FC = () => {
   }, [currentScript, currentProject]); // Dependencies for the effect
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 dark:bg-dark-900">
+    <div className="flex flex-col h-screen bg-gray-50 dark:bg-dark-900 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] [&_*::-webkit-scrollbar]:hidden [&_*]:[-ms-overflow-style:'none'] [&_*]:[scrollbar-width:'none']">
       {/* Header with gradient and shadow */}
       <header className="bg-gradient-to-r from-primary-600 to-primary-800 dark:from-primary-800 dark:to-primary-900 shadow-lg">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
@@ -1046,7 +1059,6 @@ const AppContent: React.FC = () => {
                     <div className="container mx-auto px-6 py-4 flex justify-between items-center">
                       <div>
                         <h2 className="text-xl font-semibold text-gray-800">{currentProject.name}</h2>
-                        <p className="text-sm text-gray-600 mt-1">{currentProject.description || 'No description'}</p>
                       </div>
                       <div className="flex space-x-3">
                         <button
@@ -1093,89 +1105,103 @@ const AppContent: React.FC = () => {
                   >
                     <div className="container mx-auto h-full px-6">
                       <div className="flex items-center h-full">
-                        <div className="flex items-center space-x-1 overflow-x-auto py-2 flex-grow scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
-                          <AnimatePresence mode="popLayout">
-                            {currentProject.scripts.map(script => (
-                              <motion.div
-                                key={script.name}
-                                layout
-                                initial={{ opacity: 0, scale: 0.95 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 flex-shrink-0 ${
-                                  currentScript?.name === script.name
-                                    ? 'bg-white shadow-md text-blue-600'
-                                    : 'hover:bg-white hover:shadow-sm text-gray-600 hover:text-gray-800'
-                                }`}
-                                onClick={() => setCurrentScript(script)}
-                              >
-                                <div
-                                  draggable
-                                  onDragStart={(e: React.DragEvent<HTMLDivElement>) => handleDragStart(script, e)}
-                                  onDragOver={handleDragOver}
-                                  onDrop={() => handleDrop(script)}
-                                  className="flex items-center space-x-2"
-                                >
-                                  <i 
-                                    className="fas fa-grip-vertical text-sm opacity-70 mr-2 cursor-move hover:text-blue-600 transition-colors"
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.parentElement?.style.setProperty('cursor', 'move');
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.parentElement?.style.setProperty('cursor', 'pointer');
-                                    }}
-                                  ></i>
-                                  <i className="fas fa-file-code text-sm opacity-70"></i>
-                                  <span className="whitespace-nowrap">{script.name}</span>
-                                </div>
-                                <div className="flex items-center space-x-2 ml-2">
-                                  <button
-                                    className="text-gray-400 hover:text-purple-600 transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleTestScript(script);
-                                    }}
-                                    title="Test Script"
-                                  >
-                                    <i className="fas fa-flask text-sm"></i>
-                                  </button>
-                                  <button
-                                    className="text-gray-400 hover:text-blue-600 transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedScript(script);
-                                      setIsUrlConfigOpen(true);
-                                    }}
-                                    title="Configure URL Path"
-                                  >
-                                    <i className="fas fa-link text-sm"></i>
-                                  </button>
-                                  <button
-                                    className="text-gray-400 hover:text-yellow-600 transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setScriptToRename(script);
-                                    }}
-                                    title="Rename Script"
-                                  >
-                                    <i className="fas fa-pencil-alt text-sm"></i>
-                                  </button>
-                                  <button
-                                    className="text-gray-400 hover:text-red-500 transition-colors"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteScript(script.name);
-                                    }}
-                                    title="Delete Script"
-                                  >
-                                    <i className="fas fa-times"></i>
-                                  </button>
-                                </div>
-                              </motion.div>
-                            ))}
-                          </AnimatePresence>
+                        <div className="relative flex-1 h-full">
+                          <div className="absolute inset-0 overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                            <div className="flex items-center h-full min-w-max">
+                              <div className="flex items-center space-x-[-20px] py-2">
+                                <AnimatePresence mode="popLayout">
+                                  {currentProject.scripts.map((script, index) => (
+                                    <motion.div
+                                      key={script.name}
+                                      layout
+                                      initial={{ opacity: 0, scale: 0.95 }}
+                                      animate={{ opacity: 1, scale: 1 }}
+                                      exit={{ opacity: 0, scale: 0.95 }}
+                                      whileHover={{ 
+                                        scale: 1.05,
+                                        zIndex: 50,
+                                        transition: { duration: 0.2 }
+                                      }}
+                                      whileTap={{ scale: 0.98 }}
+                                      style={{
+                                        zIndex: currentScript?.name === script.name ? 40 : 30 - index,
+                                        transform: `translateX(${index * -10}px)`
+                                      }}
+                                      className={`px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2 flex-shrink-0 shadow-md ${
+                                        currentScript?.name === script.name
+                                          ? 'bg-white text-blue-600'
+                                          : 'bg-white/90 hover:bg-white text-gray-600 hover:text-gray-800'
+                                      }`}
+                                      onClick={() => setCurrentScript(script)}
+                                    >
+                                      <div
+                                        draggable
+                                        onDragStart={(e: React.DragEvent<HTMLDivElement>) => handleDragStart(script, e)}
+                                        onDragOver={handleDragOver}
+                                        onDrop={() => handleDrop(script)}
+                                        className="flex items-center space-x-2"
+                                      >
+                                        <i 
+                                          className="fas fa-grip-vertical text-sm opacity-70 mr-2 cursor-move hover:text-blue-600 transition-colors"
+                                          onMouseEnter={(e) => {
+                                            e.currentTarget.parentElement?.style.setProperty('cursor', 'move');
+                                          }}
+                                          onMouseLeave={(e) => {
+                                            e.currentTarget.parentElement?.style.setProperty('cursor', 'pointer');
+                                          }}
+                                        ></i>
+                                        <i className="fas fa-file-code text-sm opacity-70"></i>
+                                        <span className="whitespace-nowrap">{script.name}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2 ml-2">
+                                        <button
+                                          className="text-gray-400 hover:text-purple-600 transition-colors"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleTestScript(script);
+                                          }}
+                                          title="Test Script"
+                                        >
+                                          <i className="fas fa-flask text-sm"></i>
+                                        </button>
+                                        <button
+                                          className="text-gray-400 hover:text-blue-600 transition-colors"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedScript(script);
+                                            setIsUrlConfigOpen(true);
+                                          }}
+                                          title="Configure URL Path"
+                                        >
+                                          <i className="fas fa-link text-sm"></i>
+                                        </button>
+                                        <button
+                                          className="text-gray-400 hover:text-yellow-600 transition-colors"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setScriptToRename(script);
+                                          }}
+                                          title="Rename Script"
+                                        >
+                                          <i className="fas fa-pencil-alt text-sm"></i>
+                                        </button>
+                                        <button
+                                          className="text-gray-400 hover:text-red-500 transition-colors"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteScript(script.name);
+                                          }}
+                                          title="Delete Script"
+                                        >
+                                          <i className="fas fa-times"></i>
+                                        </button>
+                                      </div>
+                                    </motion.div>
+                                  ))}
+                                </AnimatePresence>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                         <motion.button
                           whileHover={{ scale: 1.05 }}
@@ -1305,6 +1331,7 @@ const AppContent: React.FC = () => {
           onClose={() => setIsNewScriptModalOpen(false)}
           onCreate={handleCreateScript}
           existingScriptNames={currentProject.scripts.map(s => s.name)}
+          projectName={currentProject.name}
         />
       )}
       <Alert
@@ -1393,7 +1420,7 @@ const AppContent: React.FC = () => {
 const App: React.FC = () => {
   return (
     <ThemeProvider>
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none'] [&_*::-webkit-scrollbar]:hidden [&_*]:[-ms-overflow-style:'none'] [&_*]:[scrollbar-width:'none']">
         <AppContent />
         {/* Copyright Footer */}
       </div>

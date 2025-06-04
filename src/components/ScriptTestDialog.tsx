@@ -109,6 +109,7 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
   const [queryParams, setQueryParams] = useState<QueryParam[]>(savedState?.queryParams || [{ key: '', value: '' }]);
   const [activeTab, setActiveTab] = useState<'body' | 'headers' | 'params'>('body');
   const [responseWidth, setResponseWidth] = useState(400);
+  const [requestDuration, setRequestDuration] = useState<number | null>(null);
   const isResizing = useRef(false);
   const lastX = useRef(0);
   const responseRef = useRef<HTMLDivElement>(null);
@@ -179,6 +180,9 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
   const handleTest = async () => {
     setIsLoading(true);
     setError(null);
+    setRequestDuration(null);
+    const startTime = performance.now();
+    
     try {
       const validHeaders = headers
         .filter(h => h.key && h.value)
@@ -205,6 +209,9 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
       response.headers.forEach((value, key) => {
         responseHeaders[key] = value;
       });
+      
+      const endTime = performance.now();
+      setRequestDuration(endTime - startTime);
       
       setResponse({
         data,
@@ -521,13 +528,20 @@ const ScriptTestDialog: React.FC<ScriptTestDialogProps> = ({
                   <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Response
                   </h4>
-                  <button
-                    onClick={handleCopyCurl}
-                    className="text-sm text-gray-500 hover:text-purple-600 transition-colors flex items-center space-x-2"
-                  >
-                    <i className="fas fa-terminal"></i>
-                    <span>Copy cURL</span>
-                  </button>
+                  <div className="flex items-center space-x-4">
+                    {requestDuration !== null && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        Duration: {requestDuration.toFixed(2)}ms
+                      </span>
+                    )}
+                    <button
+                      onClick={handleCopyCurl}
+                      className="text-sm text-gray-500 hover:text-purple-600 transition-colors flex items-center space-x-2"
+                    >
+                      <i className="fas fa-terminal"></i>
+                      <span>Copy cURL</span>
+                    </button>
+                  </div>
                 </div>
 
                 {error ? (
