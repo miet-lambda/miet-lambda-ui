@@ -163,7 +163,7 @@ const AppContent: React.FC = () => {
     }
   };
 
-  const handleRegister = async (name: string, email: string, password: string, confirmPassword: string) => {
+  const handleRegister = async (email: string, password: string, confirmPassword: string) => {
     if (password !== confirmPassword) {
       showAlert({
         title: 'Validation Error',
@@ -172,7 +172,7 @@ const AppContent: React.FC = () => {
       });
       return;
     }
-
+    
     try {
       await auth.register(email, password);
       await handleLogin(email, password);
@@ -870,36 +870,26 @@ const AppContent: React.FC = () => {
             {currentUser && (
               <>
                 <button
-                  onClick={() => setIsApiKeyModalOpen(true)}
+                  onClick={() => setShowProfile(true)}
                   className="text-sm bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
                 >
-                  <i className="fas fa-key"></i>
-                  <span>API Key</span>
+                  <i className="fas fa-user"></i>
+                  <span>Profile</span>
                 </button>
-                <div className="relative group">
-                  <button className="flex items-center space-x-3 focus:outline-none">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center text-white font-semibold text-lg transform transition-transform group-hover:scale-105">
-                      {currentUser.name.charAt(0).toUpperCase()}
-                    </div>
-                    <i className="fas fa-chevron-down text-white text-xs opacity-70 group-hover:opacity-100 transition-opacity"></i>
-                  </button>
-                  <div className="absolute right-0 mt-3 w-48 bg-white dark:bg-dark-800 rounded-xl shadow-xl py-2 scale-95 opacity-0 invisible group-hover:scale-100 group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
-                    <button 
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-body"
-                      onClick={() => setShowProfile(true)}
-                    >
-                      Profile
-                    </button>
-                    <button 
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-primary-50 dark:hover:bg-primary-900/50 hover:text-primary-600 dark:hover:text-primary-400 transition-colors font-body"
-                      onClick={() => setShowSettings(true)}
-                    >
-                      Settings
-                    </button>
-                    <div className="h-px bg-gray-200 dark:bg-dark-700 my-2"></div>
-                    <button onClick={handleLogout} className="block w-full text-left px-4 py-2 text-sm text-warning-600 dark:text-warning-500 hover:bg-warning-50 dark:hover:bg-warning-900/30 transition-colors">Sign Out</button>
-                  </div>
-                </div>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="text-sm bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
+                >
+                  <i className="fas fa-cog"></i>
+                  <span>Settings</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="text-sm bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition-all duration-200 flex items-center space-x-2"
+                >
+                  <i className="fas fa-sign-out-alt"></i>
+                  <span>Sign Out</span>
+                </button>
               </>
             )}
             {!currentUser && (

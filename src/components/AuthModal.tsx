@@ -6,14 +6,13 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLogin: (email: string, password: string) => void;
-  onRegister: (name: string, email: string, password: string, confirmPassword: string) => void;
+  onRegister: (email: string, password: string, confirmPassword: string) => void;
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegister }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -21,7 +20,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
     if (isLoginMode) {
       onLogin(email, password);
     } else {
-      onRegister(name, email, password, confirmPassword);
+      onRegister(email, password, confirmPassword);
     }
   };
 
@@ -41,29 +40,11 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
       title={isLoginMode ? "Sign In" : "Create Account"}
     >
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
-        {!isLoginMode && (
-          <motion.div
-            variants={inputVariants}
-            initial="hidden"
-            animate="visible"
-            custom={0}
-          >
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter your name"
-            />
-          </motion.div>
-        )}
-        
         <motion.div
           variants={inputVariants}
           initial="hidden"
           animate="visible"
-          custom={1}
+          custom={0}
         >
           <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
           <input
@@ -79,7 +60,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
           variants={inputVariants}
           initial="hidden"
           animate="visible"
-          custom={2}
+          custom={1}
         >
           <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
           <input
@@ -96,7 +77,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
             variants={inputVariants}
             initial="hidden"
             animate="visible"
-            custom={3}
+            custom={2}
           >
             <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
             <input
@@ -113,7 +94,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onRegis
           variants={inputVariants}
           initial="hidden"
           animate="visible"
-          custom={4}
+          custom={3}
           className="flex flex-col space-y-3 pt-2"
         >
           <motion.button
